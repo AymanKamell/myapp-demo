@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Environment / secrets
+.env
+*.env
+
+# Kubernetes secrets
+*-secret.yaml
+secret.yaml
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Temporary files
+*.swp
+*.tmp

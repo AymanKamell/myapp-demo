@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: myapp-backend-reader
+  namespace: myapp
+subjects:
+  - kind: ServiceAccount
+    name: myapp-backend
+    namespace: myapp
+roleRef:
+  kind: Role
+  name: myapp-backend-reader
+  apiGroup: rbac.authorization.k8s.io
