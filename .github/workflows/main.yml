@@ -60,10 +60,11 @@ jobs:
           roxctl version
 
       - name: Test RHACS connection
+        env:
+          ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+          ROX_ENDPOINT: ${{ vars.ROX_ENDPOINT }}
         run: |
-          roxctl -e "${{ vars.ROX_ENDPOINT }}" \
-            --token "${{ secrets.ROX_API_TOKEN }}" \
-            version
+          roxctl central whoami
           
       - name: Update backend deployment
         run: |
