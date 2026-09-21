@@ -15,4 +15,4 @@ jobs:
 
       - name: Build backend image
         run: |
-          docker build -t myapp-backend:latest ./backend
+          docker build -t myapp-backend:latest ./backend/backend-application/
