@@ -26,3 +26,9 @@ jobs:
       - name: Push backend image
         run: |
           docker push ${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
+      - name: Login into Openshift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: false
