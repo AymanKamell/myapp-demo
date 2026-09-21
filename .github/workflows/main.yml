@@ -47,3 +47,14 @@ jobs:
         run: |
           oc whoami
           oc project myapp
+
+          
+      - name: Update backend deployment
+        run: |
+          oc -n myapp set image deployment/backend \
+            backend=docker.io/${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
+
+
+      - name: Wait for backend rollout
+        run: |
+          oc -n myapp rollout status deployment/backend
