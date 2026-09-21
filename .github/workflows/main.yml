@@ -48,6 +48,22 @@ jobs:
           oc whoami
           oc project myapp
 
+      - name: Install roxctl
+        run: |
+          curl -L -o roxctl \
+            "https://mirror.openshift.com/pub/rhacs/assets/4.11.4/bin/Linux/roxctl"
+          chmod +x roxctl
+          sudo mv roxctl /usr/local/bin/roxctl
+
+      - name: Verify roxctl
+        run: |
+          roxctl version
+
+      - name: Test RHACS connection
+        run: |
+          roxctl -e "${{ vars.ROX_ENDPOINT }}" \
+            --token "${{ secrets.ROX_API_TOKEN }}" \
+            version
           
       - name: Update backend deployment
         run: |
