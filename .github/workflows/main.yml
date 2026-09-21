@@ -13,6 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Build backend image
         run: |
-          docker build -t myapp-backend:latest ./backend/backend-application/
+          docker build -t myapp-backend:latest ./YOUR-CURRENT-BACKEND-PATH
