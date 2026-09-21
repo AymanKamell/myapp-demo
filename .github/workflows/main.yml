@@ -69,7 +69,7 @@ jobs:
 
       - name: Check image with RHACS
         run: |
-          roxctl image check \
+          roxctl image check -o table \
             --image="${{ vars.DOCKER_USERNAME }}/myapp-backend:latest"
           
       - name: Update backend deployment
