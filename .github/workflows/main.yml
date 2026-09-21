@@ -26,6 +26,12 @@ jobs:
       - name: Push backend image
         run: |
           docker push ${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
+    
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: latest
+      
       - name: Login into Openshift
         uses: redhat-actions/oc-login@v1
         with:
