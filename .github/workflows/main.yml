@@ -21,4 +21,8 @@ jobs:
 
       - name: Build backend image
         run: |
-          docker build -t myapp-backend:latest ./backend/backend-application/
+          docker build -t ${{ vars.DOCKER_USERNAME }}/myapp-backend:latest ./backend/backend-application/
+
+      - name: Push backend image
+        run: |
+          docker push ${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
