@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitleaks-test
-  namespace: myapp
-type: Opaque
-stringData:
-  API_KEY: "ghp_7a9KxP2mL8vQ4rT6yU1nW3cD5eF9gH2jK6"
