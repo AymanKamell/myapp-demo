@@ -6,6 +6,27 @@ on:
       - main
 
 jobs:
+
+  source-security:
+    name: Source Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
+
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
