@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: frontend
+  namespace: myapp
+spec:
+  host: frontend-myapp.apps.sno-cluster.ocp.aymanocp.online
+  to:
+    kind: Service
+    name: frontend
+    weight: 100
+  port:
+    targetPort: 8080
+  wildcardPolicy: None
