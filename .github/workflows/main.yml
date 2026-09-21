@@ -1,4 +1,4 @@
-name: First Pipeline
+name: Backend CI
 
 on:
   push:
@@ -6,15 +6,13 @@ on:
       - main
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Show repository
+      - name: Build backend image
         run: |
-          echo "GitHub Actions is working!"
-          echo "Repository contents:"
-          ls -la
+          docker build -t myapp-backend:latest ./backend
