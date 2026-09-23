@@ -75,6 +75,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: Verify Cosign installation
+        run: |
+          cosign version
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
