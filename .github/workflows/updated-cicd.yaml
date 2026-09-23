@@ -254,6 +254,17 @@ jobs:
           name: myapp-backend-sbom
           path: myapp-backend.spdx.json
           if-no-files-found: error
+
+      - name: Test Cosign SBOM attestation
+        run: |
+          echo "Image reference: $IMAGE_REF"
+          echo "SBOM: myapp-backend.spdx.json"
+
+          cosign attest \
+          --yes \
+          --type spdx \
+          --predicate myapp-backend.spdx.json \
+          "$IMAGE_REF"
       
   rhacs-scan:
     name: RHACS Image Scan
