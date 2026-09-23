@@ -270,7 +270,7 @@ jobs:
           cosign attest \
             --yes \
             --key cosign.key \
-            --type spdx \
+            --type spdxjson \
             --predicate myapp-backend.spdx.json \
             "$IMAGE_REF"
 
