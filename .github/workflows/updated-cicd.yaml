@@ -67,6 +67,11 @@ jobs:
       contents: read
       security-events: write
 
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+
     needs:
       - source-security
       - test
@@ -255,16 +260,21 @@ jobs:
           path: myapp-backend.spdx.json
           if-no-files-found: error
 
-      - name: Test Cosign SBOM attestation
+      - name: Attest SBOM with Cosign
         run: |
+          echo "$COSIGN_PRIVATE_KEY" > cosign.key
+
           echo "Image reference: $IMAGE_REF"
           echo "SBOM: myapp-backend.spdx.json"
 
           cosign attest \
-          --yes \
-          --type spdx \
-          --predicate myapp-backend.spdx.json \
-          "$IMAGE_REF"
+            --yes \
+            --key cosign.key \
+            --type spdx \
+            --predicate myapp-backend.spdx.json \
+            "$IMAGE_REF"
+
+          rm -f cosign.key
       
   rhacs-scan:
     name: RHACS Image Scan
