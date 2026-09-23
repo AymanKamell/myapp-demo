@@ -270,8 +270,10 @@ jobs:
           cosign attest \
             --yes \
             --key cosign.key \
-            --type spdxjson \
+            --type https://spdx.dev/Document \
             --predicate myapp-backend.spdx.json \
+            --bundle sbom-attestation.sigstore.json \
+            --upload=false \
             "$IMAGE_REF"
 
           rm -f cosign.key
