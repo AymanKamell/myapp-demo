@@ -82,11 +82,35 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Build backend image archive
+      - name: Build backend image
         run: |
           docker buildx build \
-            --output type=docker,dest=myapp-backend.tar \
+            --tag myapp-backend:ci \
+            --load \
+            --metadata-file build-metadata.json \
             ./backend/backend-application/
+
+      - name: Get image digest
+        run: |
+          IMAGE_DIGEST=$(jq -r '.["containerimage.digest"]' build-metadata.json)
+
+          echo "Image digest: $IMAGE_DIGEST"
+
+          echo "IMAGE_REF=myapp-backend@${IMAGE_DIGEST}" >> "$GITHUB_ENV"
+          echo "IMAGE_DIGEST=${IMAGE_DIGEST}" >> "$GITHUB_ENV"
+
+      - name: Verify local image
+        run: |
+          docker image ls myapp-backend
+
+          echo ""
+          echo "Image reference:"
+          echo "$IMAGE_REF"
+
+          echo ""
+          echo "Image inspect:"
+          docker inspect myapp-backend:ci \
+            --format '{{.Id}}'
 
       - name: Verify image archive
         run: |
