@@ -260,9 +260,23 @@ jobs:
           path: myapp-backend.spdx.json
           if-no-files-found: error
 
-      - name: Check Cosign attest-blob
+      - name: Attest SBOM with Cosign
         run: |
-          cosign attest-blob --help
+          echo "$COSIGN_PRIVATE_KEY" > cosign.key
+
+          echo "Image reference: $IMAGE_REF"
+          echo "SBOM: myapp-backend.spdx.json"
+
+          cosign attest-blob \
+            --yes \
+            --key cosign.key \
+            --type spdxjson \
+            --predicate myapp-backend.spdx.json \
+            --output-attestation sbom-attestation.json \
+            --bundle sbom-attestation.sigstore.json \
+            "$IMAGE_REF"
+
+          rm -f cosign.key
       
   rhacs-scan:
     name: RHACS Image Scan
