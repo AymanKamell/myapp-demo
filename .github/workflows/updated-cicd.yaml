@@ -90,6 +90,14 @@ jobs:
           echo "OCI archive contents:"
           tar -tf myapp-backend.tar | head -20
 
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          input: myapp-backend.tar
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          format: table
 
   image-security:
     name: Image Security Scan
