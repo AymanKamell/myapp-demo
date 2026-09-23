@@ -64,6 +64,11 @@ jobs:
   build:
     name: Build Backend OCI Artifact
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+
     needs:
       - source-security
       - test
@@ -101,30 +106,35 @@ jobs:
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
-            --format table
+            --format sarif
+            --output trivy-image-results.sarif
 
-  image-security:
-    name: Image Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
-
-    steps:
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
+      - name: Upload Trivy SARIF report
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          image-ref: docker.io/${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: 1
-          ignore-unfixed: true
+          sarif_file: trivy-image-results.sarif
+
+            
+      - name: Generate SBOM
+        run: |
+          trivy image \
+            --input myapp-backend.tar \
+            --format spdx-json \
+            --output myapp-backend.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v5
+        with:
+          name: myapp-backend-sbom
+          path: myapp-backend.spdx.json
+          if-no-files-found: error
 
 
+      
   rhacs-scan:
     name: RHACS Image Scan
     runs-on: ubuntu-latest
-    needs: image-security
+    needs: build
     permissions:
       contents: read
 
