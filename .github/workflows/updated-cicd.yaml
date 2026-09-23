@@ -112,11 +112,18 @@ jobs:
           docker inspect myapp-backend:ci \
             --format '{{.Id}}'
 
-      - name: Verify image archive
+      - name: Verify local image
         run: |
-          ls -lh myapp-backend.tar
-          echo "Archive contents:"
-          tar -tf myapp-backend.tar | head -20
+          docker image ls myapp-backend
+
+          echo ""
+          echo "Image reference:"
+          echo "$IMAGE_REF"
+
+          echo ""
+          echo "Image inspect:"
+          docker inspect myapp-backend:ci \
+          --format '{{.Id}}'
 
       - name: Install Trivy
         uses: aquasecurity/setup-trivy@v0.2.6
@@ -126,7 +133,7 @@ jobs:
       - name: Run Trivy image scan
         run: |
           trivy image \
-            --input myapp-backend.tar \
+            myapp-backend:ci \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --format sarif \
@@ -142,7 +149,7 @@ jobs:
         if: always()
         run: |
           trivy image \
-            --input myapp-backend.tar \
+            myapp-backend:ci \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --format json \
@@ -195,7 +202,7 @@ jobs:
       - name: Generate SBOM
         run: |
           trivy image \
-            --input myapp-backend.tar \
+            myapp-backend:ci \
             --format spdx-json \
             --output myapp-backend.spdx.json
 
