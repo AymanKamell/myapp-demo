@@ -158,6 +158,14 @@ jobs:
               echo "The image contains HIGH or CRITICAL vulnerabilities."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Trivy image report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: trivy-image-report
+          path: trivy-image-results.json
+          if-no-files-found: error
           
             
       - name: Generate SBOM
