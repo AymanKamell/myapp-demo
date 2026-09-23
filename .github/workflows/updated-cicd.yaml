@@ -114,6 +114,51 @@ jobs:
         with:
           sarif_file: trivy-image-results.sarif
 
+      - name: Generate Trivy JSON report
+        if: always()
+        run: |
+          trivy image \
+            --input myapp-backend.tar \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format json \
+            --output trivy-image-results.json \
+            --exit-code 0
+
+      - name: Add Trivy Image Scan summary
+        if: always()
+        run: |
+          CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-image-results.json)
+          HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-image-results.json)
+
+          TOTAL=$((CRITICAL + HIGH))
+
+          {
+            echo "## Trivy Image Scan summary"
+            echo ""
+
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "# No HIGH or CRITICAL vulnerabilities detected ✅"
+            else
+              echo "# Vulnerabilities detected ❌"
+            fi
+
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---:|"
+            echo "| 🔴 CRITICAL | $CRITICAL |"
+            echo "| 🟠 HIGH | $HIGH |"
+            echo ""
+
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "**Security gate:** ✅ PASSED"
+            else
+              echo "**Security gate:** ❌ FAILED"
+              echo ""
+              echo "The image contains HIGH or CRITICAL vulnerabilities."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          
             
       - name: Generate SBOM
         run: |
