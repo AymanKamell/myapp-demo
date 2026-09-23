@@ -77,27 +77,31 @@ jobs:
         with:
           driver: docker-container
 
-
-      - name: Build backend OCI artifact
+      - name: Build backend image archive
         run: |
           docker buildx build \
-            --output type=oci,dest=myapp-backend.tar \
+            --output type=docker,dest=myapp-backend.tar \
             ./backend/backend-application/
 
-      - name: Verify OCI artifact
+      - name: Verify image archive
         run: |
           ls -lh myapp-backend.tar
-          echo "OCI archive contents:"
+          echo "Archive contents:"
           tar -tf myapp-backend.tar | head -20
 
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.2.6
         with:
-          input: myapp-backend.tar
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: 1
-          format: table
+          version: v0.69.3
+
+      - name: Run Trivy image scan
+        run: |
+          trivy image \
+            --input myapp-backend.tar \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table
 
   image-security:
     name: Image Security Scan
