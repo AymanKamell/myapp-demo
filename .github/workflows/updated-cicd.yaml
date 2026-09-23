@@ -59,8 +59,7 @@ jobs:
           pytest
 
 
-
-   build:
+  build:
     name: Build Backend OCI Artifact
     runs-on  : ubuntu-latest
 
