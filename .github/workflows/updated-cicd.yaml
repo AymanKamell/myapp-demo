@@ -6,7 +6,6 @@ on:
       - main
 
 jobs:
-
   source-security:
     name: Source Security Scan
     runs-on: ubuntu-latest
