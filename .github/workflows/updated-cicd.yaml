@@ -61,10 +61,10 @@ jobs:
 
 
 
-  build:
+   build:
     name: Build Backend OCI Artifact
-    runs-on: ubuntu-latest
-    
+    runs-on  : ubuntu-latest
+
     permissions:
       contents: read
       security-events: write
@@ -112,23 +112,14 @@ jobs:
           docker inspect myapp-backend:ci \
             --format '{{.Id}}'
 
-      - name: Verify local image
-        run: |
-          docker image ls myapp-backend
-
-          echo ""
-          echo "Image reference:"
-          echo "$IMAGE_REF"
-
-          echo ""
-          echo "Image inspect:"
-          docker inspect myapp-backend:ci \
-          --format '{{.Id}}'
-
       - name: Install Trivy
         uses: aquasecurity/setup-trivy@v0.2.6
         with:
           version: v0.69.3
+
+      # --------------------------------------------------
+      # Trivy Image Security Scan
+      # --------------------------------------------------
 
       - name: Run Trivy image scan
         run: |
@@ -139,11 +130,15 @@ jobs:
             --format sarif \
             --output trivy-image-results.sarif \
             --exit-code 1
-            
+
       - name: Upload Trivy SARIF report
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image-results.sarif
+
+      # --------------------------------------------------
+      # Trivy JSON Report
+      # --------------------------------------------------
 
       - name: Generate Trivy JSON report
         if: always()
@@ -155,6 +150,41 @@ jobs:
             --format json \
             --output trivy-image-results.json \
             --exit-code 0
+
+      # --------------------------------------------------
+      # Trivy HTML Report
+      # --------------------------------------------------
+
+      - name: Download Trivy HTML template
+        if: always()
+        run: |
+          curl -L \
+            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl \
+            -o html.tpl
+
+      - name: Generate Trivy HTML report
+        if: always()
+        run: |
+          trivy image \
+            myapp-backend:ci \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format template \
+            --template "@html.tpl" \
+            --output trivy-image-results.html \
+            --exit-code 0
+
+      - name: Upload Trivy HTML report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: trivy-image-html-report
+          path: trivy-image-results.html
+          if-no-files-found: error
+
+      # --------------------------------------------------
+      # GitHub Actions Security Summary
+      # --------------------------------------------------
 
       - name: Add Trivy Image Scan summary
         if: always()
@@ -190,6 +220,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # --------------------------------------------------
+      # Trivy JSON Artifact
+      # --------------------------------------------------
+
       - name: Upload Trivy image report
         if: always()
         uses: actions/upload-artifact@v5
@@ -197,8 +231,11 @@ jobs:
           name: trivy-image-report
           path: trivy-image-results.json
           if-no-files-found: error
-          
-            
+
+      # --------------------------------------------------
+      # SBOM
+      # --------------------------------------------------
+
       - name: Generate SBOM
         run: |
           trivy image \
@@ -212,8 +249,6 @@ jobs:
           name: myapp-backend-sbom
           path: myapp-backend.spdx.json
           if-no-files-found: error
-
-
       
   rhacs-scan:
     name: RHACS Image Scan
