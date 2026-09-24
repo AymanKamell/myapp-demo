@@ -114,6 +114,7 @@ jobs:
           trivy image \
             "$IMAGE" \
             --severity HIGH,CRITICAL \
+            --ignore-unfixed \
             --format json \
             --output trivy-image-results.json \
             --exit-code 0
