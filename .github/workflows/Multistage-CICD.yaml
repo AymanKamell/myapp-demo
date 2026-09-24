@@ -114,6 +114,88 @@ jobs:
             --output trivy-image-results.json \
             --exit-code 0
 
+      - name: Download Trivy HTML template
+        if: always()
+        run: |
+          curl -L \
+            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl \
+            -o html.tpl
+
+      - name: Generate Trivy HTML report
+        if: always()
+        run: |
+          trivy image \
+            "$IMAGE" \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format template \
+            --template "@html.tpl" \
+            --output trivy-image-results.html \
+            --exit-code 0
+
+      - name: Upload Trivy HTML report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: trivy-image-html-report
+          path: trivy-image-results.html
+          if-no-files-found: error
+
+      - name: Add Trivy Image Scan summary
+        if: always()
+        run: |
+          CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-image-results.json)
+          HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-image-results.json)
+
+          TOTAL=$((CRITICAL + HIGH))
+
+          {
+            echo "## Trivy Image Scan summary"
+            echo ""
+            echo "**Image:** \`$IMAGE\`"
+            echo ""
+
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "# No HIGH or CRITICAL vulnerabilities detected ✅"
+            else
+              echo "# Vulnerabilities detected ❌"
+            fi
+
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---:|"
+            echo "| 🔴 CRITICAL | $CRITICAL |"
+            echo "| 🟠 HIGH | $HIGH |"
+            echo "| **TOTAL** | **$TOTAL** |"
+            echo ""
+
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "**Security gate:** ✅ PASSED"
+            else
+              echo "**Security gate:** ❌ FAILED"
+              echo ""
+              echo "The image contains HIGH or CRITICAL vulnerabilities."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: Enforce Trivy security gate
+        run: |
+          CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-image-results.json)
+          HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-image-results.json)
+
+          TOTAL=$((CRITICAL + HIGH))
+
+          echo "CRITICAL vulnerabilities: $CRITICAL"
+          echo "HIGH vulnerabilities: $HIGH"
+          echo "TOTAL vulnerabilities: $TOTAL"
+
+          if [ "$TOTAL" -gt 0 ]; then
+            echo "Trivy security gate FAILED."
+            exit 1
+          fi
+
+          echo "Trivy security gate PASSED."
           
       - name: Push backend image
         run: |
