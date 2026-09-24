@@ -246,11 +246,28 @@ jobs:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
           cosign attest \
-            --yes \
-            --key cosign.key \
-            --type https://spdx.dev/Document \
-            --predicate myapp-backend.spdx.json \
-            "$IMAGE@$IMAGE_DIGEST"
+          --yes \
+          --key cosign.key \
+          --type spdxjson \
+          --predicate myapp-backend.spdx.json \
+          "$IMAGE@$IMAGE_DIGEST"
+
+          
+      - name: Prepare Cosign public key
+        env:
+          COSIGN_PUBLIC_KEY: ${{ vars.COSIGN_PUBLIC_KEY }}
+        run: |
+          printf '%s' "$COSIGN_PUBLIC_KEY" > cosign.pub
+          chmod 644 cosign.pub
+
+          
+      - name: Verify SBOM attestation
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cosign verify-attestation \
+          --key cosign.pub \
+          "$IMAGE@$IMAGE_DIGEST"
           
   image-security:
     name: Image Security Scan
