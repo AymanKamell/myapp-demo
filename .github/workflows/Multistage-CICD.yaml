@@ -61,7 +61,7 @@ jobs:
 
 
 
-  build:
+  build-secure:
     name: Build and Secure Image
     runs-on: ubuntu-latest
     needs:
@@ -322,28 +322,13 @@ jobs:
             echo "- **Signing:** Cosign"
           } >> "$GITHUB_STEP_SUMMARY"
           
-  image-security:
-    name: Image Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
-
-    steps:
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: docker.io/${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: 1
-          ignore-unfixed: true
-
 
   rhacs-scan:
     name: RHACS Image Scan
     runs-on: ubuntu-latest
-    needs: image-security
+    
+    needs: build-secure
+   
     permissions:
       contents: read
 
@@ -363,8 +348,7 @@ jobs:
         run: |
           roxctl image check \
             -o table \
-            --image="${{ vars.DOCKER_USERNAME }}/myapp-backend:latest"
-
+            --image="${{ needs.build-secure.outputs.image-ref }}"
 
   deploy:
     name: Deploy to OpenShift
