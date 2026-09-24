@@ -372,7 +372,15 @@ jobs:
           name: rhacs-policy-json
           path: rhacs-policy-check.json
           if-no-files-found: error
+      - name: Upload RHACS HTML report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: rhacs-policy-html-report
+          path: rhacs-policy-check.html
+          if-no-files-found: error
 
+          
   deploy:
     name: Deploy to OpenShift
     runs-on: ubuntu-latest
