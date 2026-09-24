@@ -357,6 +357,11 @@ jobs:
           echo "===== RHACS JSON REPORT ====="
           jq . rhacs-policy-check.json
 
+      - name: Generate RHACS HTML report
+        if: always()
+        run: |
+          python3 scripts/generate-rhacs-report.py
+
       - name: Upload RHACS JSON report
         if: always()
         uses: actions/upload-artifact@v5
