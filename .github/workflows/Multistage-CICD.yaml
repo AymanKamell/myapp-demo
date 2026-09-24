@@ -276,6 +276,12 @@ jobs:
           --yes \
           --key cosign.key \
           "$IMAGE@$IMAGE_DIGEST"
+
+      - name: Verify image signature
+        run: |
+          cosign verify \
+          --key cosign.pub \
+          "$IMAGE@$IMAGE_DIGEST"
           
   image-security:
     name: Image Security Scan
