@@ -141,41 +141,35 @@ jobs:
           path: trivy-image-results.html
           if-no-files-found: error
 
-      - name: Add Trivy Image Scan summary
+      - name: Trivy Image Security Report
         if: always()
         run: |
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-image-results.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-image-results.json)
-
           TOTAL=$((CRITICAL + HIGH))
 
+          if [ "$TOTAL" -eq 0 ]; then
+            GATE="PASS"
+          else
+            GATE="FAIL"
+          fi
+
           {
-            echo "## Trivy Image Scan summary"
+            echo "## Trivy Image Security Report"
             echo ""
-            echo "**Image:** \`$IMAGE\`"
-            echo ""
-
-            if [ "$TOTAL" -eq 0 ]; then
-              echo "# No HIGH or CRITICAL vulnerabilities detected ✅"
-            else
-              echo "# Vulnerabilities detected ❌"
-            fi
-
-            echo ""
-            echo "| Severity | Count |"
+            echo "| Metric | Result |"
             echo "|---|---:|"
-            echo "| 🔴 CRITICAL | $CRITICAL |"
-            echo "| 🟠 HIGH | $HIGH |"
-            echo "| **TOTAL** | **$TOTAL** |"
+            echo "| Critical vulnerabilities | $CRITICAL |"
+            echo "| High vulnerabilities | $HIGH |"
+            echo "| Total findings | $TOTAL |"
+            echo "| Security gate | $GATE |"
             echo ""
-
-            if [ "$TOTAL" -eq 0 ]; then
-              echo "**Security gate:** ✅ PASSED"
-            else
-              echo "**Security gate:** ❌ FAILED"
-              echo ""
-              echo "The image contains HIGH or CRITICAL vulnerabilities."
-            fi
+            echo "### Scan Target"
+            echo ""
+            echo "- **Image:** \`$IMAGE\`"
+            echo "- **Severity:** HIGH, CRITICAL"
+            echo "- **Unfixed vulnerabilities:** Ignored"
+            echo "- **Report:** Trivy JSON"
           } >> "$GITHUB_STEP_SUMMARY"
 
 
@@ -183,7 +177,6 @@ jobs:
         run: |
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-image-results.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-image-results.json)
-
           TOTAL=$((CRITICAL + HIGH))
 
           echo "CRITICAL vulnerabilities: $CRITICAL"
