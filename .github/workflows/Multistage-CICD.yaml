@@ -231,6 +231,26 @@ jobs:
       - name: Verify Cosign installation
         run: |
           cosign version
+
+      - name: Prepare Cosign private key
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          printf '%s' "$COSIGN_PRIVATE_KEY" > cosign.key
+          chmod 600 cosign.key
+
+          echo "Cosign private key prepared."
+
+      - name: Attest SBOM to image
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cosign attest \
+            --yes \
+            --key cosign.key \
+            --type https://spdx.dev/Document \
+            --predicate myapp-backend.spdx.json \
+            "$IMAGE@$IMAGE_DIGEST"
           
   image-security:
     name: Image Security Scan
