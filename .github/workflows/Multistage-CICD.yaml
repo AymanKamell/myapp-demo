@@ -114,7 +114,6 @@ jobs:
           trivy image \
             "$IMAGE" \
             --severity HIGH,CRITICAL \
-            --ignore-unfixed \
             --format json \
             --output trivy-image-results.json \
             --exit-code 0
@@ -129,14 +128,11 @@ jobs:
       - name: Generate Trivy HTML report
         if: always()
         run: |
-          trivy image \
-            "$IMAGE" \
-            --severity HIGH,CRITICAL \
-            --ignore-unfixed \
+          trivy convert \
             --format template \
             --template "@html.tpl" \
             --output trivy-image-results.html \
-            --exit-code 0
+            trivy-image-results.json
 
       - name: Upload Trivy HTML report
         if: always()
