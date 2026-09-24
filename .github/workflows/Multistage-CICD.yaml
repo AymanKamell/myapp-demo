@@ -199,6 +199,7 @@ jobs:
 
         
       - name: Generate SBOM
+        id: sbom
         run: |
           trivy image \
             "$IMAGE" \
@@ -242,6 +243,7 @@ jobs:
           echo "Cosign private key prepared."
 
       - name: Attest SBOM to image
+        id: attest
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
@@ -262,6 +264,7 @@ jobs:
 
           
       - name: Verify SBOM attestation
+        id: verify_attest
         run: |
           cosign verify-attestation \
           --key cosign.pub \
@@ -269,6 +272,7 @@ jobs:
           "$IMAGE@$IMAGE_DIGEST"
 
       - name: Sign image
+        id: sign
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
@@ -278,24 +282,35 @@ jobs:
           "$IMAGE@$IMAGE_DIGEST"
 
       - name: Verify image signature
+        id: verify_sign
         run: |
           cosign verify \
           --key cosign.pub \
           "$IMAGE@$IMAGE_DIGEST"
 
-      - name: Security Summary
+      - name: Security Verification Report
         if: always()
         run: |
+          status() {
+            case "$1" in
+              success)   echo "PASS" ;;
+              failure)   echo "FAIL" ;;
+              skipped)   echo "SKIPPED" ;;
+              cancelled) echo "CANCELLED" ;;
+              *)         echo "UNKNOWN" ;;
+            esac
+          }
+
           {
             echo "## Security Verification Report"
             echo ""
             echo "| Control | Status |"
             echo "|---|---|"
-            echo "| SBOM Generation | PASS |"
-            echo "| SBOM Attestation | PASS |"
-            echo "| Attestation Verification | PASS |"
-            echo "| Image Signing | PASS |"
-            echo "| Signature Verification | PASS |"
+            echo "| SBOM Generation | $(status '${{ steps.sbom.outcome }}') |"
+            echo "| SBOM Attestation | $(status '${{ steps.attest.outcome }}') |"
+            echo "| Attestation Verification | $(status '${{ steps.verify_attest.outcome }}') |"
+            echo "| Image Signing | $(status '${{ steps.sign.outcome }}') |"
+            echo "| Signature Verification | $(status '${{ steps.verify_sign.outcome }}') |"
             echo ""
             echo "### Artifact"
             echo ""
