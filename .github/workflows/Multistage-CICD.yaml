@@ -267,6 +267,15 @@ jobs:
           --key cosign.pub \
           --type https://spdx.dev/Document \
           "$IMAGE@$IMAGE_DIGEST"
+
+      - name: Sign image
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cosign sign \
+          --yes \
+          --key cosign.key \
+          "$IMAGE@$IMAGE_DIGEST"
           
   image-security:
     name: Image Security Scan
