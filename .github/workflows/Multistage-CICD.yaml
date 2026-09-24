@@ -68,6 +68,11 @@ jobs:
       - source-security
       - test
       
+    outputs:
+      image-digest: ${{ steps.image-digest.outputs.image-digest }}
+      image-ref: ${{ steps.image-digest.outputs.image-ref }}
+
+      
     permissions:
       contents: read
 
@@ -192,7 +197,7 @@ jobs:
 
         
       - name: Generate SBOM
-        id: sbom
+        id: sbom  
         run: |
           trivy image \
             "$IMAGE" \
@@ -211,6 +216,7 @@ jobs:
           docker push "$IMAGE"
 
       - name: Get pushed image digest
+        id: image-digest
         run: |
           IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d'@' -f2)
 
@@ -218,6 +224,9 @@ jobs:
           echo "Image digest: $IMAGE_DIGEST"
 
           echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
+          echo "image-digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "image-ref=$IMAGE@$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.9.0
