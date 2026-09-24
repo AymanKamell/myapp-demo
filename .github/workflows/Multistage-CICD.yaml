@@ -216,6 +216,15 @@ jobs:
         run: |
           docker push "$IMAGE"
 
+      - name: Get pushed image digest
+        run: |
+          IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d'@' -f2)
+
+          echo "Image: $IMAGE"
+          echo "Image digest: $IMAGE_DIGEST"
+
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
           
   image-security:
     name: Image Security Scan
