@@ -214,9 +214,9 @@ jobs:
           
       - name: Push backend image
         run: |
-          docker push ${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
+          docker push "$IMAGE"
 
-
+          
   image-security:
     name: Image Security Scan
     runs-on: ubuntu-latest
