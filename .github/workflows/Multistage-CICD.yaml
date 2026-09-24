@@ -196,6 +196,21 @@ jobs:
           fi
 
           echo "Trivy security gate PASSED."
+
+        
+      - name: Generate SBOM
+        run: |
+          trivy image \
+            "$IMAGE" \
+            --format spdx-json \
+            --output myapp-backend.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v5
+        with:
+          name: myapp-backend-sbom
+          path: myapp-backend.spdx.json
+          if-no-files-found: error
           
       - name: Push backend image
         run: |
