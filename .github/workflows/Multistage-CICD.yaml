@@ -225,6 +225,12 @@ jobs:
 
           echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.9.0
+
+      - name: Verify Cosign installation
+        run: |
+          cosign version
           
   image-security:
     name: Image Security Scan
