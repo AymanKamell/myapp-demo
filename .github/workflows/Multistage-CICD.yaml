@@ -351,6 +351,20 @@ jobs:
             --image="${{ needs.build-secure.outputs.image-ref }}" \
             > rhacs-policy-check.json
 
+      - name: Inspect RHACS JSON report
+        if: always()
+        run: |
+          echo "===== RHACS JSON REPORT ====="
+          jq . rhacs-policy-check.json
+
+      - name: Upload RHACS JSON report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: rhacs-policy-json
+          path: rhacs-policy-check.json
+          if-no-files-found: error
+
   deploy:
     name: Deploy to OpenShift
     runs-on: ubuntu-latest
