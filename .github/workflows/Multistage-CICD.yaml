@@ -347,8 +347,9 @@ jobs:
       - name: RHACS image check
         run: |
           roxctl image check \
-            -o table \
-            --image="${{ needs.build-secure.outputs.image-ref }}"
+            -o json \
+            --image="${{ needs.build-secure.outputs.image-ref }}" \
+            > rhacs-policy-check.json
 
   deploy:
     name: Deploy to OpenShift
