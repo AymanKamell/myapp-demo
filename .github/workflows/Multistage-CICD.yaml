@@ -262,11 +262,10 @@ jobs:
 
           
       - name: Verify SBOM attestation
-        env:
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
           cosign verify-attestation \
           --key cosign.pub \
+          --type https://spdx.dev/Document \
           "$IMAGE@$IMAGE_DIGEST"
           
   image-security:
