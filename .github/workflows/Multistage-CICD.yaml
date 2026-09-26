@@ -40,21 +40,25 @@ jobs:
         if: always()
         run: |
           {
-            echo "## 🔐 Source Security Summary"
+            echo "## Source Security Scan"
             echo ""
             echo "| Security Control | Status |"
             echo "|---|---|"
-            echo "| Trivy Filesystem Scan | ${{ steps.trivy-fs.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |"
-            echo "| Gitleaks Secret Scan | ${{ steps.gitleaks.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| Trivy Filesystem Scan | ${{ steps.trivy-fs.outcome == 'success' && 'PASS' || 'FAIL' }} |"
+            echo "| Gitleaks Secret Detection | ${{ steps.gitleaks.outcome == 'success' && 'PASS' || 'FAIL' }} |"
             echo ""
             echo "### Scan Configuration"
             echo ""
-            echo "- **Trivy Severity:** HIGH, CRITICAL"
-            echo "- **Unfixed Vulnerabilities:** Ignored"
-            echo "- **Secret Detection:** Gitleaks"
-            echo "- **Source:** Repository filesystem"
+            echo "| Parameter | Configuration |"
+            echo "|---|---|"
+            echo "| Scan Type | Filesystem |"
+            echo "| Severity | HIGH, CRITICAL |"
+            echo "| Unfixed Vulnerabilities | Ignored |"
+            echo "| Secret Detection | Gitleaks |"
+            echo "| Scan Target | Repository filesystem |"
           } >> "$GITHUB_STEP_SUMMARY"
-
+ 
+  
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -80,6 +84,50 @@ jobs:
         run: |
           pytest
 
+      - name: Generate test summary
+        if: always()
+        working-directory: backend/backend-application
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("pytest-results.xml").getroot()
+
+          tests = int(root.attrib.get("tests", 0))
+          failures = int(root.attrib.get("failures", 0))
+          errors = int(root.attrib.get("errors", 0))
+          skipped = int(root.attrib.get("skipped", 0))
+          duration = root.attrib.get("time", "0")
+
+          passed = tests - failures - errors - skipped
+
+          status = (
+              "PASS"
+              if failures == 0 and errors == 0
+              else "FAIL"
+          )
+
+          print("## Unit Test Summary")
+          print("")
+          print("| Test Metric | Result |")
+          print("|---|---:|")
+          print(f"| Test Status | {status} |")
+          print(f"| Total Tests | {tests} |")
+          print(f"| Passed | {passed} |")
+          print(f"| Failed | {failures} |")
+          print(f"| Errors | {errors} |")
+          print(f"| Skipped | {skipped} |")
+          print(f"| Execution Time | {duration}s |")
+          print("")
+          print("### Test Configuration")
+          print("")
+          print("| Parameter | Configuration |")
+          print("|---|---|")
+          print("| Framework | pytest |")
+          print("| Python Version | 3.12 |")
+          print("| Working Directory | backend/backend-application |")
+          PY
+
   sonarqube:
     name: SonarQube Cloud Analysis
     runs-on: ubuntu-latest
@@ -94,6 +142,7 @@ jobs:
           fetch-depth: 0
 
       - name: SonarQube Scan
+        id: sonarqube
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -101,6 +150,34 @@ jobs:
           args: >
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+
+      - name: Generate SonarQube summary
+        if: always()
+        run: |
+          {
+            echo "## SonarQube Cloud Analysis"
+            echo ""
+            echo "| Quality Control | Status |"
+            echo "|---|---|"
+            echo "| SonarQube Analysis | ${{ steps.sonarqube.outcome == 'success' && 'PASS' || 'FAIL' }} |"
+            echo "| Quality Gate | ${{ steps.sonarqube.outcome == 'success' && 'PASS' || 'FAIL' }} |"
+            echo ""
+            echo "### Analysis Configuration"
+            echo ""
+            echo "| Parameter | Configuration |"
+            echo "|---|---|"
+            echo "| Project | AymanKamell_myapp-demo |"
+            echo "| Organization | aymankamel |"
+            echo "| Branch | ${{ github.ref_name }} |"
+            echo "| Analysis Type | Static Code Analysis |"
+            echo "| Quality Gate | Sonar way |"
+            echo "| Quality Gate Enforcement | Enabled |"
+            echo "| Quality Gate Timeout | 300 seconds |"
+            echo ""
+            echo "### SonarQube Cloud"
+            echo ""
+            echo "[View SonarQube Project](https://sonarcloud.io/dashboard?id=AymanKamell_myapp-demo&branch=${{ github.ref_name }})"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build-secure:
     name: Build and Secure Image
