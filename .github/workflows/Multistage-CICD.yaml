@@ -20,6 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Trivy filesystem scan
+        id: trivy-fs
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -30,10 +31,29 @@ jobs:
           ignore-unfixed: true
 
       - name: Run Gitleaks
+        id: gitleaks
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate security summary
+        if: always()
+        run: |
+          {
+            echo "## 🔐 Source Security Summary"
+            echo ""
+            echo "| Security Control | Status |"
+            echo "|---|---|"
+            echo "| Trivy Filesystem Scan | ${{ steps.trivy-fs.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| Gitleaks Secret Scan | ${{ steps.gitleaks.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo ""
+            echo "### Scan Configuration"
+            echo ""
+            echo "- **Trivy Severity:** HIGH, CRITICAL"
+            echo "- **Unfixed Vulnerabilities:** Ignored"
+            echo "- **Secret Detection:** Gitleaks"
+            echo "- **Source:** Repository filesystem"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test:
     name: Unit Tests
@@ -55,6 +75,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
+        id: pytest
         working-directory: backend/backend-application
         run: |
           pytest
@@ -87,6 +108,7 @@ jobs:
     needs:
       - source-security
       - test
+      - sonarqube
       
     outputs:
       image-digest: ${{ steps.image-digest.outputs.image-digest }}
