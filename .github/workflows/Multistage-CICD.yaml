@@ -508,7 +508,7 @@ jobs:
         run: |
           oc project myapp
           oc set image deployment/backend \
-            backend=${{ vars.DOCKER_USERNAME }}/myapp-backend:latest
+            backend=${{ vars.DOCKER_USERNAME }}/myapp-backend:${{ github.sha }}
 
       - name: Wait for rollout
         run: |
