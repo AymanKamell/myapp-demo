@@ -46,16 +46,6 @@ jobs:
             echo "|---|---|"
             echo "| Trivy Filesystem Scan | ${{ steps.trivy-fs.outcome == 'success' && 'PASS' || 'FAIL' }} |"
             echo "| Gitleaks Secret Detection | ${{ steps.gitleaks.outcome == 'success' && 'PASS' || 'FAIL' }} |"
-            echo ""
-            echo "### Scan Configuration"
-            echo ""
-            echo "| Parameter | Configuration |"
-            echo "|---|---|"
-            echo "| Scan Type | Filesystem |"
-            echo "| Severity | HIGH, CRITICAL |"
-            echo "| Unfixed Vulnerabilities | Ignored |"
-            echo "| Secret Detection | Gitleaks |"
-            echo "| Scan Target | Repository filesystem |"
           } >> "$GITHUB_STEP_SUMMARY"
  
   
@@ -77,12 +67,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest-html
 
       - name: Run tests
         id: pytest
         working-directory: backend/backend-application
         run: |
-          pytest
+          pytest --html=pytest-report.html --self-contained-html
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pytest-html-report
+          path: backend/backend-application/pytest-report.html
 
       - name: Generate test summary
         if: always()
