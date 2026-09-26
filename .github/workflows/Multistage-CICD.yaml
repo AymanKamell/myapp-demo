@@ -85,46 +85,27 @@ jobs:
       - name: Generate test summary
         if: always()
         working-directory: backend/backend-application
+        env:
+          TEST_OUTCOME: ${{ steps.pytest.outcome }}
         run: |
-          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import xml.etree.ElementTree as ET
-
-          root = ET.parse("pytest-results.xml").getroot()
-
-          tests = int(root.attrib.get("tests", 0))
-          failures = int(root.attrib.get("failures", 0))
-          errors = int(root.attrib.get("errors", 0))
-          skipped = int(root.attrib.get("skipped", 0))
-          duration = root.attrib.get("time", "0")
-
-          passed = tests - failures - errors - skipped
-
-          status = (
-              "PASS"
-              if failures == 0 and errors == 0
-              else "FAIL"
-          )
-
-          print("## Unit Test Summary")
-          print("")
-          print("| Test Metric | Result |")
-          print("|---|---:|")
-          print(f"| Test Status | {status} |")
-          print(f"| Total Tests | {tests} |")
-          print(f"| Passed | {passed} |")
-          print(f"| Failed | {failures} |")
-          print(f"| Errors | {errors} |")
-          print(f"| Skipped | {skipped} |")
-          print(f"| Execution Time | {duration}s |")
-          print("")
-          print("### Test Configuration")
-          print("")
-          print("| Parameter | Configuration |")
-          print("|---|---|")
-          print("| Framework | pytest |")
-          print("| Python Version | 3.12 |")
-          print("| Working Directory | backend/backend-application |")
-          PY
+          {
+            echo "## Unit Test Summary"
+            echo ""
+            echo "| Test Control | Status |"
+            echo "|---|---|"
+            echo "| Unit Tests | ${TEST_OUTCOME^^} |"
+            echo "| HTML Test Report | GENERATED |"
+            echo ""
+            echo "### Test Configuration"
+            echo ""
+            echo "| Parameter | Configuration |"
+            echo "|---|---|"
+            echo "| Framework | pytest |"
+            echo "| Python Version | 3.12 |"
+            echo "| Test Location | backend/backend-application |"
+            echo "| Report Format | HTML |"
+            echo "| Report Artifact | pytest-html-report |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   sonarqube:
     name: SonarQube Cloud Analysis
