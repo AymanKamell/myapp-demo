@@ -59,7 +59,23 @@ jobs:
         run: |
           pytest
 
+  sonarqube:
+    name: SonarQube Cloud Analysis
+    runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-secure:
     name: Build and Secure Image
