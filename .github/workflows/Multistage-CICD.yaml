@@ -293,8 +293,8 @@ jobs:
 
     env:
       IMAGE_NAME: ${{ vars.DOCKER_USERNAME }}/myapp-backend
-      IMAGE_TAG: ${{ github.sha }}
-      IMAGE: ${{ vars.DOCKER_USERNAME }}/myapp-backend:${{ github.sha }}
+      IMAGE_TAG: v-${{ github.run_number }}
+      IMAGE: ${{ vars.DOCKER_USERNAME }}/myapp-backend:v-${{ github.run_number }}
 
     steps:
       - name: Checkout repository
