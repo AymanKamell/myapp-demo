@@ -97,6 +97,13 @@ jobs:
           path: backend/backend-application/ruff-lint-report.json
           if-no-files-found: error
 
+      - name: Display lint report
+        if: always()
+        working-directory: backend/backend-application
+        run: |
+          echo "===== Ruff Lint Report ====="
+          cat ruff-lint-report.json
+
       - name: Generate lint summary
         if: always()
         env:
@@ -246,6 +253,7 @@ jobs:
       - source-security
       - test
       - sonarqube
+      - lint
       
     outputs:
       image-digest: ${{ steps.image-digest.outputs.image-digest }}
