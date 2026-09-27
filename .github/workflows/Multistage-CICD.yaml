@@ -275,6 +275,7 @@ jobs:
 
   build-secure:
     name: Build and Secure Image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs:
       - source-security
@@ -537,7 +538,7 @@ jobs:
   rhacs-scan:
     name: RHACS Image Scan
     runs-on: ubuntu-latest
-    
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-secure
    
     permissions:
@@ -595,6 +596,7 @@ jobs:
   deploy:
     name: Deploy to OpenShift
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: rhacs-scan
     permissions:
       contents: read
