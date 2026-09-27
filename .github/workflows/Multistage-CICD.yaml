@@ -48,6 +48,87 @@ jobs:
             echo "| Gitleaks Secret Detection | ${{ steps.gitleaks.outcome == 'success' && 'PASS' || 'FAIL' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
  
+
+  lint:
+    name: Python Linting
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff lint
+        id: ruff
+        working-directory: backend/backend-application
+        run: |
+          ruff check . --output-format json > ruff-lint-report.json
+
+      - name: Count lint violations
+        if: always()
+        id: lint-results
+        working-directory: backend/backend-application
+        run: |
+          if [ -f ruff-lint-report.json ]; then
+            VIOLATIONS=$(jq 'length' ruff-lint-report.json)
+          else
+            VIOLATIONS=0
+          fi
+
+          echo "violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ruff-lint-report
+          path: backend/backend-application/ruff-lint-report.json
+          if-no-files-found: error
+
+      - name: Generate lint summary
+        if: always()
+        env:
+          LINT_OUTCOME: ${{ steps.ruff.outcome }}
+          VIOLATIONS: ${{ steps.lint-results.outputs.violations }}
+        run: |
+          if [ "$LINT_OUTCOME" = "success" ]; then
+            STATUS="PASS"
+            GATE="PASSED"
+          else
+            STATUS="FAIL"
+            GATE="FAILED"
+          fi
+
+          {
+            echo "## Linting Report"
+            echo ""
+            echo "| Control | Status |"
+            echo "|---|---|"
+            echo "| Linting | $STATUS |"
+            echo "| Tool | Ruff |"
+            echo "| Source | backend/backend-application |"
+            echo "| Files Checked | Python source and test files |"
+            echo "| Violations | $VIOLATIONS |"
+            echo "| Lint Gate | $GATE |"
+            echo ""
+            echo "### Report Artifact"
+            echo ""
+            echo "| Artifact | Status |"
+            echo "|---|---|"
+            echo "| ruff-lint-report | GENERATED |"
+          } >> "$GITHUB_STEP_SUMMARY"
   
   test:
     name: Unit Tests
