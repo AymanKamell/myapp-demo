@@ -99,12 +99,21 @@ jobs:
 
         echo "violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
 
-    - name: Upload lint report
+    - name: Generate HTML lint report
+      if: always()
+      run: |
+        python scripts/generate-ruff-report.py \
+          backend/backend-application/ruff-lint-report.json \
+          backend/backend-application/ruff-lint-report.html
+
+    - name: Upload lint reports
       if: always()
       uses: actions/upload-artifact@v6
       with:
-        name: ruff-lint-report
-        path: backend/backend-application/ruff-lint-report.json
+        name: ruff-lint-reports
+        path: |
+          backend/backend-application/ruff-lint-report.json
+          backend/backend-application/ruff-lint-report.html
         if-no-files-found: error
 
     - name: Generate lint summary
@@ -138,6 +147,7 @@ jobs:
           echo "| Artifact | Status |"
           echo "|---|---|"
           echo "| ruff-lint-report | GENERATED |"
+          echo "| ruff-lint-report.html | GENERATED |"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Enforce lint gate
