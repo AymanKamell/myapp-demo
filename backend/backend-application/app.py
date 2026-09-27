@@ -1,6 +1,7 @@
-from flask import Flask, jsonify
 import os
+
 import psycopg2
+from flask import Flask, jsonify
 
 app = Flask(__name__)
 
@@ -43,7 +44,7 @@ def database():
             "status": "connected"
         })
 
-    except Exception as e:
+    except psycopg2.Error as e:
         return jsonify({
             "status": "error",
             "message": str(e)
