@@ -12,3 +12,6 @@ on:
 jobs:
   source-security:
     uses: ./.github/workflows/source-security.yml
+
+  lint:
+    uses: ./.github/workflows/lint.yml
