@@ -59,3 +59,14 @@ jobs:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  gitops-deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - build-secure
+      - cosign
+    uses: ./.github/workflows/gitops-deploy.yml
+    with:
+      image-ref: ${{ needs.build-secure.outputs.image-ref }}
+    secrets:
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
