@@ -22,7 +22,7 @@ Red Hat Advanced Cluster Security for Kubernetes provides additional container a
 
 The overall delivery process follows this sequence:
 
-<img width="423" height="715" alt="image" src="https://github.com/user-attachments/assets/55cf2f50-bded-4ebe-a150-39d2c3387b56" />
+<img width="340" height="647" alt="image" src="https://github.com/user-attachments/assets/0d28e457-24ce-4333-b05a-02005422e718" />
 
 ---
 
