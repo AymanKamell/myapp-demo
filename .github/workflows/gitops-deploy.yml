@@ -3,8 +3,8 @@ name: GitOps Deployment
 on:
   workflow_call:
     inputs:
-      image-ref:
-        description: "Immutable image reference"
+      image-digest:
+        description: "Immutable image digest"
         required: true
         type: string
 
@@ -32,13 +32,8 @@ jobs:
       - name: Update backend image digest
         working-directory: myapp-gitops
         env:
-          IMAGE_REF: ${{ inputs.image-ref }}
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
         run: |
-          IMAGE_DIGEST="${IMAGE_REF##*@}"
-
-          echo "Updating backend image digest to:"
-          echo "$IMAGE_DIGEST"
-
           sed -i \
             "s|^\(\s*digest:\s*\).*|\1${IMAGE_DIGEST}|" \
             backend/kustomization.yaml
@@ -49,6 +44,7 @@ jobs:
           git diff -- backend/kustomization.yaml
 
       - name: Commit and push GitOps change
+        id: gitops-push
         working-directory: myapp-gitops
         run: |
           git config user.name "github-actions[bot]"
@@ -56,7 +52,36 @@ jobs:
 
           git add backend/kustomization.yaml
 
-          git commit \
-            -m "Update backend image digest"
+          git commit -m "Update backend image digest"
 
           git push origin main
+
+      - name: Generate GitOps deployment summary
+        if: always()
+        env:
+          PUSH_OUTCOME: ${{ steps.gitops-push.outcome }}
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+        run: |
+          if [ "$PUSH_OUTCOME" = "success" ]; then
+            STATUS="SUCCESS"
+          else
+            STATUS="FAILED"
+          fi
+
+          {
+            echo "## GitOps Deployment Summary"
+            echo ""
+            echo "| Deployment Control | Status |"
+            echo "|---|---|"
+            echo "| GitOps Repository Update | $STATUS |"
+            echo "| Git Push | $STATUS |"
+            echo ""
+            echo "### Deployment Details"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Repository | AymanKamell/myapp-gitops |"
+            echo "| Branch | main |"
+            echo "| Manifest | backend/kustomization.yaml |"
+            echo "| Image Digest | \`$IMAGE_DIGEST\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

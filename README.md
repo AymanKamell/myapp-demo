@@ -1,795 +1,488 @@
-# Kubernetes 3-Tier Application — RHACS Security Demo
+# DevSecOps CI/CD Pipeline
 
-A small **3-tier application deployed on Kubernetes** and used as a hands-on lab for learning **Red Hat Advanced Cluster Security for Kubernetes (RHACS)**, Kubernetes security controls, networking, RBAC, resource management, and container security.
+## 1. Overview
 
-The application consists of a frontend, backend API, and PostgreSQL database. The deployment also includes Kubernetes NetworkPolicies, ResourceQuota, ServiceAccounts, RBAC, persistent storage, and an Ingress.
+This project implements an enterprise-oriented CI/CD pipeline that integrates software quality, security, supply-chain protection, container security, image signing, and GitOps-based deployment.
 
----
+The pipeline is designed to provide security and quality controls throughout the software delivery lifecycle, from source-code changes through application deployment.
 
-## 1. Architecture
+The architecture separates continuous integration from continuous deployment.
 
-The application follows this architecture:
+GitHub Actions is responsible for building, testing, scanning, validating, signing, and promoting application artifacts.
 
-```text
-                         Browser
-                            |
-                            | HTTP
-                            v
-                  NodePort :32279
-                            |
-                            v
-               NGINX Ingress Controller
-                            |
-                            v
-                    Frontend Service
-                            |
-                            v
-                    Frontend Pod
-                     NGINX container
-                            |
-                     /api/* proxy
-                            |
-                            v
-                    Backend Service
-                            |
-                            v
-                    Backend Pod
-                     Flask application
-                            |
-                         TCP 5432
-                            |
-                            v
-                   PostgreSQL Service
-                            |
-                            v
-                    PostgreSQL Pod
-                            |
-                            v
-                    PersistentVolume
-```
+The GitOps repository represents the desired deployment state.
 
-The Kubernetes traffic flow is:
+Argo CD continuously monitors the GitOps repository and reconciles the OpenShift environment with the desired state stored in Git.
 
-```text
-Browser
-  -> Ingress NodePort
-  -> NGINX Ingress Controller
-  -> frontend Service
-  -> frontend Pod
-  -> backend Service
-  -> backend Pod
-  -> postgres Service
-  -> PostgreSQL Pod
-  -> PVC
-```
+Red Hat Advanced Cluster Security for Kubernetes provides additional container and runtime security controls.
 
 ---
 
-## 2. Components
+# 2. Pipeline Architecture
 
-| Component               | Technology                | Kubernetes Resource               |
-| ----------------------- | ------------------------- | --------------------------------- |
-| Frontend                | NGINX                     | Deployment                        |
-| Backend                 | Python / Flask            | Deployment                        |
-| Database                | PostgreSQL 16             | StatefulSet                       |
-| External access         | NGINX Ingress Controller  | Ingress                           |
-| Database storage        | local-path                | PersistentVolumeClaim             |
-| Application isolation   | Kubernetes NetworkPolicy  | NetworkPolicy                     |
-| Resource control        | Kubernetes ResourceQuota  | ResourceQuota                     |
-| Application identity    | Kubernetes ServiceAccount | ServiceAccount                    |
-| Application permissions | Kubernetes RBAC           | Role / RoleBinding                |
-| Security platform       | RHACS                     | Red Hat Advanced Cluster Security |
+The overall delivery process follows this sequence:
+
+<img width="423" height="715" alt="image" src="https://github.com/user-attachments/assets/55cf2f50-bded-4ebe-a150-39d2c3387b56" />
 
 ---
 
-# 3. Repository Structure
+# 3. Source Security
 
-```text
-myapp/
-├── backend/
-│   ├── backend-application/
-│   │   ├── app.py
-│   │   ├── requirements.txt
-│   │   └── Dockerfile
-│   ├── backend-service.yaml
-│   ├── backend-serviceaccount.yaml
-│   ├── backend.yaml
-│   ├── role-app.yaml
-│   └── rolebinding-app.yaml
-│
-├── database/
-│   ├── db-pvc.yaml
-│   ├── db-service.yaml
-│   ├── db.yaml
-│   └── db-secret.yaml
-│
-├── frontend/
-│   ├── frontend-application/
-│   │   ├── index.html
-│   │   ├── nginx.conf
-│   │   └── Dockerfile
-│   ├── frontend-ingress.yaml
-│   ├── frontend-service.yaml
-│   └── frontend.yaml
-│
-├── networkPolicy.yml
-├── resource-quotas.yaml
-└── README.md
-```
+The source security stage performs security analysis against the application source before the application is built and promoted.
 
-> `database/db-secret.yaml` contains database credentials and is intentionally excluded from Git using `.gitignore`.
+The stage includes vulnerability analysis of the source filesystem and dependency content.
+
+It also performs secret detection to identify credentials, tokens, private keys, passwords, and other sensitive information that may have been accidentally committed to the repository.
+
+The purpose of this stage is to identify security issues as early as possible in the development lifecycle.
+
+A failed security control prevents the application from progressing through the pipeline.
 
 ---
 
-# 4. Prerequisites
+# 4. Automated Unit Testing
 
-The lab requires:
+The testing stage executes the application's automated unit tests.
 
-* Kubernetes cluster
-* `kubectl`
-* Docker
-* Access to a container registry
-* NGINX Ingress Controller
-* RHACS installed in the cluster
-* `roxctl` for RHACS CLI operations
+Unit testing verifies that individual application components behave according to their expected functionality.
 
-Verify the Kubernetes cluster:
+The test stage provides an automated validation mechanism that runs consistently for every applicable pipeline execution.
 
-```bash
-kubectl get nodes
-```
+The test results are evaluated as part of the pipeline gate.
 
-Verify the Ingress Controller:
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-Verify RHACS:
-
-```bash
-kubectl get pods -n stackrox
-```
+If the required tests fail, subsequent delivery stages are prevented from progressing.
 
 ---
 
-# 5. Create the Application Namespace
+# 5. Code Coverage
 
-Create the namespace:
+Code coverage measures the amount of application code exercised by the automated tests.
 
-```bash
-kubectl create namespace myapp
-```
+The coverage result provides visibility into how extensively the test suite exercises the application.
 
-Verify:
+Coverage information is also made available to the static analysis platform so that code quality analysis can consider test coverage as part of the overall quality assessment.
 
-```bash
-kubectl get namespace myapp
-```
+Coverage reports are generated and retained as pipeline artifacts for later inspection.
 
 ---
 
-# 6. Build the Backend Image
+# 6. Code Linting
 
-The backend is a Flask application exposing the following endpoints:
+The linting stage performs automated analysis of the source code according to the language and project coding standards.
 
-```text
-/health
-/api/message
-/api/db
-```
+Linting identifies issues such as:
 
-Build the image:
+* Syntax and formatting problems
+* Unused code
+* Code-quality violations
+* Potential programming errors
+* Violations of configured coding rules
 
-```bash
-cd backend/backend-application
+The linting result is evaluated as a quality gate.
 
-docker build -t docker.io/aymankamell/myapp-backend:1.0 .
-```
+A failed linting gate prevents the pipeline from progressing.
 
-Push the image:
-
-```bash
-docker push docker.io/aymankamell/myapp-backend:1.0
-```
+A machine-readable report and a human-readable report are generated and retained as pipeline artifacts.
 
 ---
 
-# 7. Build the Frontend Image
+# 7. Static Code Analysis
 
-The frontend uses NGINX to serve the web application and proxy API requests to the backend.
+The static analysis stage evaluates the source code without executing the application.
 
-Build the image:
+The analysis identifies potential code-quality and maintainability issues and provides additional software quality metrics.
 
-```bash
-cd frontend/frontend-application
+The analysis platform also consumes the generated test coverage information.
 
-docker build -t docker.io/aymankamell/myapp-frontend:1.2 .
-```
+A Quality Gate is used to determine whether the analyzed code meets the configured quality requirements.
 
-Push the image:
+The pipeline waits for the Quality Gate result before continuing.
 
-```bash
-docker push docker.io/aymankamell/myapp-frontend:1.2
-```
+A failed Quality Gate prevents the application from progressing to the subsequent build and security stages.
 
 ---
 
-# 8. Deploy PostgreSQL
+# 8. Application Build
 
-The database consists of:
+After the source, test, and quality controls have passed, the application is built into its deployable form.
 
-* PostgreSQL StatefulSet
-* PostgreSQL Service
-* PersistentVolumeClaim
-* Kubernetes Secret
+For containerized workloads, this stage produces the container image that will subsequently be scanned and promoted.
 
-Apply the database resources:
-
-```bash
-kubectl apply -f database/db-pvc.yaml
-kubectl apply -f database/db-service.yaml
-kubectl apply -f database/db.yaml
-```
-
-Create the database Secret separately:
-
-```bash
-kubectl apply -f database/db-secret.yaml
-```
-
-Verify:
-
-```bash
-kubectl get pods -n myapp
-kubectl get svc -n myapp
-kubectl get pvc -n myapp
-```
-
-The PostgreSQL pod should become:
-
-```text
-postgres-0    Running
-```
-
-Verify the StatefulSet:
-
-```bash
-kubectl get statefulset -n myapp
-```
+The image is associated with the source revision that produced it, providing traceability between the source code and the resulting artifact.
 
 ---
 
-# 9. Deploy the Backend
+# 9. Container Image Vulnerability Scanning
 
-Create the backend ServiceAccount:
+The container image is scanned for known vulnerabilities before it is promoted for deployment.
 
-```bash
-kubectl apply -f backend/backend-serviceaccount.yaml
-```
+The scan evaluates the operating system packages, application dependencies, and other components contained within the image.
 
-Apply the RBAC resources:
+The pipeline applies the configured severity policy to determine whether detected vulnerabilities are acceptable.
 
-```bash
-kubectl apply -f backend/role-app.yaml
-kubectl apply -f backend/rolebinding-app.yaml
-```
+High and critical vulnerabilities are evaluated against the configured security gate.
 
-Deploy the backend:
+The scan generates both structured and human-readable results.
 
-```bash
-kubectl apply -f backend/backend.yaml
-kubectl apply -f backend/backend-service.yaml
-```
+The reports are retained as pipeline artifacts.
 
-Verify:
-
-```bash
-kubectl get pods -n myapp -l app=backend
-kubectl get svc -n myapp backend
-```
-
-Check the backend logs:
-
-```bash
-kubectl logs -n myapp deploy/backend
-```
-
-Test the health endpoint from inside the Pod:
-
-```bash
-kubectl exec -n myapp deploy/backend -- \
-  python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/health').read().decode())"
-```
-
-Expected response:
-
-```json
-{"status":"healthy"}
-```
+If the configured security gate fails, the image is not promoted to the subsequent supply-chain stages.
 
 ---
 
-# 10. Test Backend-to-Database Connectivity
+# 10. Software Bill of Materials
 
-The backend exposes an endpoint that verifies PostgreSQL connectivity:
+The pipeline generates a Software Bill of Materials for the container image.
 
-```text
-/api/db
-```
+The SBOM provides an inventory of the software components and dependencies contained within the image.
 
-Run:
+The SBOM improves software supply-chain visibility and provides information that can be used for vulnerability management, compliance, incident response, and component tracking.
 
-```bash
-kubectl exec -n myapp deploy/backend -- \
-  python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/api/db').read().decode())"
-```
+The generated SBOM is retained as a pipeline artifact.
 
-Expected response:
-
-```json
-{
-  "database": "appdb",
-  "status": "connected",
-  "user": "appuser"
-}
-```
-
-A direct TCP test can also be performed:
-
-```bash
-kubectl exec -n myapp deploy/backend -- \
-  python -c "import socket; s=socket.create_connection(('postgres',5432),5); print('TCP connection to postgres:5432 successful'); s.close()"
-```
-
-Expected:
-
-```text
-TCP connection to postgres:5432 successful
-```
+The SBOM is subsequently used as part of the image attestation process.
 
 ---
 
-# 11. Deploy the Frontend
+# 11. Container Image Registry
 
-Apply the frontend Deployment:
+After the image passes the required container security controls, it is pushed to the configured container registry.
 
-```bash
-kubectl apply -f frontend/frontend.yaml
-```
+The registry stores the container image and provides an immutable digest that identifies the exact image content.
 
-Create the Service:
+The deployment process uses the image digest rather than relying solely on a mutable image tag.
 
-```bash
-kubectl apply -f frontend/frontend-service.yaml
-```
-
-Create the Ingress:
-
-```bash
-kubectl apply -f frontend/frontend-ingress.yaml
-```
-
-Verify:
-
-```bash
-kubectl get pods -n myapp -l app=frontend
-kubectl get svc -n myapp frontend
-kubectl get ingress -n myapp
-```
+This ensures that the image deployed to the environment corresponds to the exact artifact that passed the pipeline controls.
 
 ---
 
-# 12. Access the Application
+# 12. Immutable Image Identification
 
-For a bare-metal NGINX Ingress Controller deployment, determine the NodePort:
+The pipeline uses the image digest as the immutable identifier for deployment.
 
-```bash
-kubectl get svc -n ingress-nginx
-```
+A container image tag can potentially be moved to different image content.
 
-Example:
+A digest, however, identifies a specific image manifest and its associated content.
 
-```text
-ingress-nginx-controller
-HTTP NodePort: 32279
-```
+Using the digest in the GitOps configuration provides deterministic deployment behavior.
 
-The application can then be accessed through:
-
-```text
-http://<NODE-IP>:32279
-```
-
-For example:
-
-```text
-http://192.168.153.128:32279
-```
+The GitOps repository therefore records exactly which image artifact should be deployed.
 
 ---
 
-# 13. Apply the ResourceQuota
+# 13. RHACS Image Security Validation
 
-The application namespace has a ResourceQuota to control the total resources consumed by the workload.
+Red Hat Advanced Cluster Security for Kubernetes is integrated into the CI/CD process to evaluate the container image against configured security policies.
 
-Apply it:
+The image is checked before it is promoted for deployment.
 
-```bash
-kubectl apply -f resource-quotas.yaml
-```
+RHACS evaluates the image against the applicable build-stage policies and returns the policy evaluation result to the pipeline.
 
-Verify:
+The pipeline uses the RHACS result as a security gate.
 
-```bash
-kubectl get resourcequota -n myapp
-```
+If the image violates a required RHACS policy, the pipeline fails and the deployment process does not proceed.
 
-Inspect usage:
-
-```bash
-kubectl describe resourcequota -n myapp
-```
-
-The quota limits:
-
-```text
-CPU requests
-Memory requests
-CPU limits
-Memory limits
-Number of Pods
-```
+The RHACS policy results are generated in structured and human-readable formats and retained as pipeline artifacts.
 
 ---
 
-# 14. Apply NetworkPolicies
+# 14. Image Signing
 
-The application uses NetworkPolicies to restrict communication between tiers.
+After the image passes the required security controls, the image is cryptographically signed using Cosign.
 
-Apply:
+Image signing establishes a verifiable relationship between the image artifact and the trusted signing identity.
 
-```bash
-kubectl apply -f networkPolicy.yml
-```
+The signature allows downstream systems to verify that the image was produced and signed by an authorized source.
 
-Verify:
+The signing private key is protected using the CI/CD platform's secret-management mechanism and is not stored in the source repository.
 
-```bash
-kubectl get networkpolicy -n myapp
-```
-
-The intended traffic flow is:
-
-```text
-ingress-nginx
-      |
-      | TCP/80
-      v
-frontend
-      |
-      | TCP/8080
-      v
-backend
-      |
-      | TCP/5432
-      v
-postgres
-```
-
-The policies restrict ingress to the individual application tiers.
+The corresponding public key is used for signature verification.
 
 ---
 
-# 15. Verify the Complete Application
+# 15. SBOM Attestation
 
-Check all application resources:
+The generated SBOM is attached to the container image through a Cosign attestation.
 
-```bash
-kubectl get all -n myapp
-```
+The attestation provides a verifiable association between the image and the SBOM describing its contents.
 
-Check NetworkPolicies:
+The pipeline verifies the generated attestation after creation.
 
-```bash
-kubectl get networkpolicy -n myapp
-```
-
-Check storage:
-
-```bash
-kubectl get pvc -n myapp
-```
-
-Check quota:
-
-```bash
-kubectl get resourcequota -n myapp
-```
-
-Check the application endpoint:
-
-```bash
-curl http://<NODE-IP>:32279
-```
+This provides an additional software supply-chain control by allowing downstream systems to verify that the image has an associated signed SBOM.
 
 ---
 
-# 16. RHACS Integration
+# 16. Signature Verification
 
-RHACS is used to inspect and secure the application from multiple security perspectives.
+After signing, the pipeline verifies the image signature using the configured public key.
 
-The main RHACS areas exercised by this demo are:
+The verification confirms that the image has a valid signature corresponding to the expected signing key.
 
-* Image scanning
-* Vulnerability management
-* Network graph
-* Network policy generation
-* Kubernetes RBAC
-* ServiceAccounts
-* Resource management
-* Security policies
-* Deployment analysis
+Both signing and verification are performed as part of the pipeline.
 
-Verify RHACS:
-
-```bash
-kubectl get pods -n stackrox
-```
+This prevents the pipeline from promoting an artifact when the expected cryptographic verification cannot be completed successfully.
 
 ---
 
-# 17. Access RHACS with `roxctl`
+# 17. RHACS Cosign Signature Policy
 
-Expose RHACS Central locally:
+RHACS contains a configured image security policy named:
 
-```bash
-kubectl -n stackrox port-forward svc/central 18443:443
-```
+**Require Cosign Signuture**
 
-Configure the RHACS endpoint:
+This policy requires applicable container images to satisfy the configured Cosign signature requirement.
 
-```bash
-export ROX_ENDPOINT='localhost:18443'
-export ROX_API_TOKEN='<RHACS_API_TOKEN>'
-```
+The policy provides an additional security layer beyond the CI/CD pipeline.
 
-Because the lab uses a local port-forward:
+The CI/CD pipeline signs and verifies the image before it is promoted.
 
-```bash
-roxctl central whoami --insecure-skip-tls-verify
-```
+RHACS subsequently evaluates the image against the configured signature policy when the image is used in the OpenShift environment.
 
-This verifies that `roxctl` can authenticate against Central.
+This establishes a supply-chain trust model in which unsigned or improperly signed images can be prevented from being admitted according to the configured RHACS enforcement settings.
+
+The policy also provides visibility into image-signature compliance through the RHACS console.
 
 ---
 
-# 18. Scan the Backend Image
+# 18. GitOps Deployment
 
-The backend image can be scanned using `roxctl`:
+The deployment stage follows a GitOps model.
 
-```bash
-roxctl image scan \
-  --image docker.io/aymankamell/myapp-backend:1.0 \
-  --insecure-skip-tls-verify
-```
+Instead of directly modifying the OpenShift environment from the CI/CD pipeline, the pipeline updates the desired deployment state in the GitOps repository.
 
-This allows RHACS to analyze the image and identify known vulnerabilities and image metadata.
+The update contains the immutable image digest associated with the validated container image.
 
-The image scan depends on RHACS Central being able to communicate with the configured container registry.
+The change is committed to Git, providing an auditable record of the deployment change.
+
+Git therefore becomes the source of truth for the desired application state.
 
 ---
 
-# 19. RHACS Network Graph
+# 19. GitOps Repository
 
-The RHACS Network Graph can be used to observe the actual communication paths between workloads.
+The GitOps repository contains the Kubernetes deployment configuration required to run the application.
 
-Expected application communication:
+It represents the desired state of the environment independently from the application source repository.
 
-```text
-ingress-nginx
-      |
-      v
-frontend
-      |
-      v
-backend
-      |
-      v
-postgres
-```
+Application source changes are therefore separated from deployment configuration changes.
 
-For example, the backend should communicate with PostgreSQL over:
-
-```text
-TCP/5432
-```
-
-The backend can be used to generate database traffic:
-
-```bash
-kubectl exec -n myapp deploy/backend -- \
-  python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/api/db').read().decode())"
-```
-
-After generating traffic, the corresponding flow can be observed in RHACS Network Graph.
+Every deployment change can be traced through Git history, including the image digest that was promoted.
 
 ---
 
-# 20. Security Design
+# 20. Argo CD Automated Synchronization
 
-The application intentionally uses several Kubernetes security controls.
+Argo CD monitors the GitOps repository for changes.
 
-## ServiceAccount
+When the desired state stored in Git changes, Argo CD detects the new Git revision.
 
-The backend uses a dedicated ServiceAccount:
+Automated synchronization causes Argo CD to reconcile the OpenShift environment with the new desired state.
 
-```text
-myapp-backend
-```
+This removes the requirement for a manual deployment command after the GitOps repository has been updated.
 
-The ServiceAccount does not automatically mount a Kubernetes API token:
-
-```yaml
-automountServiceAccountToken: false
-```
-
-This follows the principle of minimizing unnecessary credentials inside application containers.
-
-## RBAC
-
-The backend has a dedicated Role and RoleBinding.
-
-The Role provides only the permissions required by the application:
-
-```text
-get
-list
-watch
-```
-
-against ConfigMaps in the `myapp` namespace.
-
-## Network Segmentation
-
-NetworkPolicies restrict communication between application tiers.
-
-The intended model is:
-
-```text
-Ingress Controller
-        |
-        v
-    Frontend
-        |
-        v
-     Backend
-        |
-        v
-    PostgreSQL
-```
-
-## Resource Management
-
-Resource requests and limits are defined for application containers.
-
-A ResourceQuota limits the total resource consumption of the namespace.
-
-## Persistent Storage
-
-PostgreSQL uses a PersistentVolumeClaim rather than storing database data only inside the container filesystem.
+Argo CD continuously maintains the relationship between the desired state in Git and the actual state running in OpenShift.
 
 ---
 
-# 21. Useful Troubleshooting Commands
+# 21. OpenShift Deployment
 
-Check all resources:
+OpenShift is the runtime platform where the application workload is deployed.
 
-```bash
-kubectl get all -n myapp
-```
+Argo CD applies the desired state represented in the GitOps repository.
 
-Check Pod status:
+The deployment uses the immutable container image digest produced by the CI/CD process.
 
-```bash
-kubectl get pods -n myapp -o wide
-```
-
-Describe a Pod:
-
-```bash
-kubectl describe pod -n myapp <POD_NAME>
-```
-
-View logs:
-
-```bash
-kubectl logs -n myapp <POD_NAME>
-```
-
-Follow logs:
-
-```bash
-kubectl logs -n myapp -f <POD_NAME>
-```
-
-Check Services:
-
-```bash
-kubectl get svc -n myapp
-```
-
-Check Endpoints:
-
-```bash
-kubectl get endpoints -n myapp
-```
-
-Check NetworkPolicies:
-
-```bash
-kubectl get networkpolicy -n myapp
-```
-
-Describe a NetworkPolicy:
-
-```bash
-kubectl describe networkpolicy -n myapp <POLICY_NAME>
-```
-
-Check quota:
-
-```bash
-kubectl describe resourcequota -n myapp
-```
+OpenShift performs the resulting workload rollout and maintains the application according to the declared Kubernetes resources.
 
 ---
 
-# 22. Cleanup
+# 22. Deployment Reconciliation
 
-To remove the application:
+The deployment process is based on continuous reconciliation rather than a one-time deployment command.
 
-```bash
-kubectl delete namespace myapp
-```
+The desired state is stored in Git.
 
-This removes the application namespace and its namespaced resources.
+Argo CD compares the desired state with the actual state of the OpenShift environment.
 
-If you want to keep the namespace and delete individual resources instead:
+If a difference is detected, Argo CD can synchronize the environment according to the configured synchronization policy.
 
-```bash
-kubectl delete -f frontend/
-kubectl delete -f backend/
-kubectl delete -f database/
-kubectl delete -f networkPolicy.yml
-kubectl delete -f resource-quotas.yaml
-```
+This provides continuous desired-state management.
 
 ---
 
-# 23. Learning Objectives
+# 23. Generated Reports and Artifacts
 
-This project is intended as a practical Kubernetes and RHACS security lab.
+The pipeline generates reports throughout the software delivery lifecycle.
 
-The main objectives are to practice:
+| Stage              | Generated Artifact              | Purpose                                         |
+| ------------------ | ------------------------------- | ----------------------------------------------- |
+| Unit Testing       | Test Report                     | Provides detailed automated test results        |
+| Unit Testing       | Coverage Report                 | Provides code coverage information              |
+| Linting            | Structured Lint Report          | Provides machine-readable linting results       |
+| Linting            | HTML Lint Report                | Provides human-readable linting results         |
+| Container Scanning | Structured Vulnerability Report | Provides machine-readable vulnerability results |
+| Container Scanning | HTML Vulnerability Report       | Provides human-readable vulnerability results   |
+| SBOM               | SPDX SBOM                       | Provides a software component inventory         |
+| RHACS              | Structured Policy Report        | Provides machine-readable RHACS policy results  |
+| RHACS              | HTML Policy Report              | Provides human-readable RHACS policy results    |
 
-```text
-Kubernetes Deployments
-Kubernetes StatefulSets
-Kubernetes Services
-Kubernetes Ingress
-Kubernetes PersistentVolumeClaims
-Kubernetes Secrets
-Kubernetes ServiceAccounts
-Kubernetes RBAC
-Kubernetes NetworkPolicies
-Kubernetes ResourceQuota
-Container image building
-Container image registries
-RHACS image scanning
-RHACS Network Graph
-RHACS network policy generation
-RHACS security policies
-roxctl
-Kubernetes troubleshooting
-```
+The generated artifacts are retained with the corresponding pipeline execution.
+
+This provides traceability and allows security, quality, and testing results to be reviewed after the pipeline completes.
+
+---
+
+# 24. Pipeline Security Gates
+
+The pipeline contains multiple security and quality gates.
+
+| Control                      | Purpose                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| Source Vulnerability Scan    | Identifies known vulnerabilities in source dependencies and filesystem content |
+| Secret Detection             | Detects accidentally committed credentials and sensitive information           |
+| Unit Testing                 | Validates application functionality                                            |
+| Code Coverage                | Measures test execution coverage                                               |
+| Linting                      | Validates source-code quality and coding standards                             |
+| Static Analysis              | Identifies code-quality and maintainability issues                             |
+| Quality Gate                 | Determines whether the source meets configured quality requirements            |
+| Container Vulnerability Scan | Identifies vulnerabilities inside the container image                          |
+| SBOM                         | Provides software component visibility                                         |
+| RHACS Policy Validation      | Evaluates the image against container security policies                        |
+| Image Signing                | Establishes cryptographic authenticity                                         |
+| SBOM Attestation             | Provides verifiable software supply-chain metadata                             |
+| Signature Verification       | Validates the image signature                                                  |
+| RHACS Signature Policy       | Enforces the configured image-signature requirement                            |
+
+These controls provide defense in depth across the software delivery lifecycle.
+
+---
+
+# 25. Failure and Promotion Model
+
+Each security and quality stage can act as a promotion gate.
+
+When a required control fails, the pipeline stops the affected delivery path.
+
+Examples include:
+
+* Source security findings exceeding the configured threshold
+* Detected secrets
+* Failed unit tests
+* Linting violations
+* Failed static analysis Quality Gate
+* Container vulnerabilities exceeding the configured threshold
+* RHACS policy violations
+* Failed SBOM attestation
+* Failed image signature verification
+* Failed GitOps repository update
+
+This prevents an artifact that has failed a required control from automatically progressing to deployment.
+
+---
+
+# 26. Auditability
+
+The architecture provides traceability across the complete software delivery lifecycle.
+
+GitHub Actions provides:
+
+* Pipeline execution history
+* Stage results
+* Security results
+* Test results
+* Generated artifacts
+* Build information
+
+Git provides:
+
+* Source-code history
+* Deployment configuration history
+* Image digest changes
+* Deployment commits
+
+Cosign provides:
+
+* Image signatures
+* SBOM attestations
+* Cryptographic verification
+
+RHACS provides:
+
+* Image security policy results
+* Signature policy results
+* Security violations
+* Runtime security visibility
+
+Argo CD provides:
+
+* Git revision tracking
+* Synchronization status
+* Application health
+* Deployment history
+* Desired-state reconciliation
+
+OpenShift provides:
+
+* Deployment status
+* Workload status
+* Rollout information
+* Runtime state
+
+---
+
+# 27. Separation of Responsibilities
+
+The architecture separates responsibilities between the major components.
+
+## GitHub Actions
+
+Responsible for continuous integration, security validation, artifact creation, image signing, and updating the desired deployment state.
+
+## Container Registry
+
+Responsible for storing and distributing validated container images.
+
+## RHACS
+
+Responsible for container security policy evaluation, image security controls, signature policy enforcement, and runtime security.
+
+## GitOps Repository
+
+Responsible for storing the desired deployment state and immutable image references.
+
+## Argo CD
+
+Responsible for monitoring the GitOps repository and reconciling the OpenShift environment with the desired state.
+
+## OpenShift
+
+Responsible for running and managing the application workload.
+
+---
+
+
+---
+
+# 29. Design Principles
+
+The implementation follows these principles:
+
+1. Security is integrated throughout the software delivery lifecycle.
+2. Quality and security controls are automated.
+3. Failed security and quality gates prevent artifact promotion.
+4. Container images are deployed using immutable digests.
+5. Software components are documented through an SBOM.
+6. Container images are cryptographically signed.
+7. SBOMs are cryptographically attested.
+8. Image signatures are independently verified.
+9. RHACS provides additional image and runtime security controls.
+10. The `Require Cosign Signuture` RHACS policy provides image-signature enforcement.
+11. Git is the source of truth for the desired deployment state.
+12. GitHub Actions does not directly deploy application workloads to OpenShift.
+13. Argo CD performs automated synchronization and desired-state reconciliation.
+14. Pipeline reports and artifacts provide evidence of testing and security validation.
+15. Git history provides an auditable deployment trail.
+16. CI and CD responsibilities are separated.
+17. Application source and deployment configuration are maintained independently.
+
+---
