@@ -46,3 +46,14 @@ jobs:
       image-ref: ${{ needs.build-secure.outputs.image-ref }}
     secrets:
       ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+
+  cosign:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - rhacs-scan
+    uses: ./.github/workflows/cosign.yml
+    with:
+      image-ref: ${{ needs.build-secure.outputs.image-ref }}
+    secrets:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
