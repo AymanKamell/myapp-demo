@@ -20,6 +20,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Download Python coverage report
+        uses: actions/download-artifact@v6
+        with:
+          name: python-coverage
+          path: backend/backend-application
+
+      - name: Verify coverage report
+        run: |
+          if [ ! -f "backend/backend-application/coverage.xml" ]; then
+            echo "Coverage report was not found."
+            exit 1
+          fi
+
+          echo "Coverage report found:"
+          ls -lh backend/backend-application/coverage.xml
+
       - name: Run SonarQube analysis
         id: sonarqube
         uses: SonarSource/sonarqube-scan-action@v8
@@ -29,6 +45,7 @@ jobs:
           args: >
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+            -Dsonar.python.coverage.reportPaths=backend/backend-application/coverage.xml
 
       - name: Fetch SonarQube metrics
         id: sonar-metrics
@@ -77,71 +94,21 @@ jobs:
         if: always()
         env:
           SONAR_SCAN_OUTCOME: ${{ steps.sonarqube.outcome }}
+          SONAR_PROJECT_KEY: AymanKamell_myapp-demo
+          SONAR_ORGANIZATION: aymankamel
         run: |
           if [ -f sonar-metrics.json ]; then
-
-            BUGS=$(jq -r '
-              .component.measures[]
-              | select(.metric=="bugs")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            VULNERABILITIES=$(jq -r '
-              .component.measures[]
-              | select(.metric=="vulnerabilities")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            SECURITY_HOTSPOTS=$(jq -r '
-              .component.measures[]
-              | select(.metric=="security_hotspots")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            CODE_SMELLS=$(jq -r '
-              .component.measures[]
-              | select(.metric=="code_smells")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            COVERAGE=$(jq -r '
-              .component.measures[]
-              | select(.metric=="coverage")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            DUPLICATION=$(jq -r '
-              .component.measures[]
-              | select(.metric=="duplicated_lines_density")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            LOC=$(jq -r '
-              .component.measures[]
-              | select(.metric=="ncloc")
-              | .value // "0"
-            ' sonar-metrics.json)
-
-            RELIABILITY=$(jq -r '
-              .component.measures[]
-              | select(.metric=="reliability_rating")
-              | .value // "N/A"
-            ' sonar-metrics.json)
-
-            SECURITY=$(jq -r '
-              .component.measures[]
-              | select(.metric=="security_rating")
-              | .value // "N/A"
-            ' sonar-metrics.json)
-
-            MAINTAINABILITY=$(jq -r '
-              .component.measures[]
-              | select(.metric=="sqale_rating")
-              | .value // "N/A"
-            ' sonar-metrics.json)
-
+            BUGS=$(jq -r '.component.measures[] | select(.metric=="bugs") | .value // "0"' sonar-metrics.json)
+            VULNERABILITIES=$(jq -r '.component.measures[] | select(.metric=="vulnerabilities") | .value // "0"' sonar-metrics.json)
+            SECURITY_HOTSPOTS=$(jq -r '.component.measures[] | select(.metric=="security_hotspots") | .value // "0"' sonar-metrics.json)
+            CODE_SMELLS=$(jq -r '.component.measures[] | select(.metric=="code_smells") | .value // "0"' sonar-metrics.json)
+            COVERAGE=$(jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"' sonar-metrics.json)
+            DUPLICATION=$(jq -r '.component.measures[] | select(.metric=="duplicated_lines_density") | .value // "0"' sonar-metrics.json)
+            LOC=$(jq -r '.component.measures[] | select(.metric=="ncloc") | .value // "0"' sonar-metrics.json)
+            RELIABILITY=$(jq -r '.component.measures[] | select(.metric=="reliability_rating") | .value // "N/A"' sonar-metrics.json)
+            SECURITY=$(jq -r '.component.measures[] | select(.metric=="security_rating") | .value // "N/A"' sonar-metrics.json)
+            MAINTAINABILITY=$(jq -r '.component.measures[] | select(.metric=="sqale_rating") | .value // "N/A"' sonar-metrics.json)
           else
-
             BUGS="N/A"
             VULNERABILITIES="N/A"
             SECURITY_HOTSPOTS="N/A"
@@ -152,19 +119,12 @@ jobs:
             RELIABILITY="N/A"
             SECURITY="N/A"
             MAINTAINABILITY="N/A"
-
           fi
 
           if [ -f sonar-quality-gate.json ]; then
-
-            QUALITY_GATE=$(jq -r '
-              .projectStatus.status // "UNKNOWN"
-            ' sonar-quality-gate.json)
-
+            QUALITY_GATE=$(jq -r '.projectStatus.status // "UNKNOWN"' sonar-quality-gate.json)
           else
-
             QUALITY_GATE="UNKNOWN"
-
           fi
 
           case "$QUALITY_GATE" in
@@ -183,22 +143,18 @@ jobs:
           esac
 
           if [ -f sonar-quality-gate.json ]; then
-
             QUALITY_GATE_CONDITIONS=$(jq -r '
-              .projectStatus.conditions[] |
-              [
-                .metricKey,
-                (.status // "UNKNOWN"),
-                (.actualValue // "N/A"),
-                (.errorThreshold // "N/A")
-              ] |
-              @tsv
+              .projectStatus.conditions[]
+              | [
+                  .metricKey,
+                  (.status // "UNKNOWN"),
+                  (.actualValue // "N/A"),
+                  (.errorThreshold // "N/A")
+                ]
+              | @tsv
             ' sonar-quality-gate.json)
-
           else
-
             QUALITY_GATE_CONDITIONS=""
-
           fi
 
           {
@@ -207,16 +163,14 @@ jobs:
 
             echo "## Analysis Overview"
             echo ""
-
             echo "| Quality Control | Result |"
             echo "|---|---|"
             echo "| SonarQube Analysis | ${SONAR_SCAN_OUTCOME^^} |"
             echo "| Quality Gate | ${QUALITY_GATE_STATUS} |"
             echo ""
 
-            echo "## SonarQube Results"
+            echo "## Project Metrics"
             echo ""
-
             echo "| Metric | Value |"
             echo "|---|---:|"
             echo "| Bugs | $BUGS |"
@@ -233,15 +187,12 @@ jobs:
 
             echo "## Quality Gate Conditions"
             echo ""
-
             echo "| Condition | Status | Actual | Threshold |"
             echo "|---|---|---:|---:|"
 
             if [ -n "$QUALITY_GATE_CONDITIONS" ]; then
-
               while IFS=$'\t' read -r METRIC STATUS ACTUAL THRESHOLD
               do
-
                 case "$STATUS" in
                   OK)
                     DISPLAY_STATUS="PASS"
@@ -258,69 +209,72 @@ jobs:
                 esac
 
                 case "$METRIC" in
-                  coverage)
-                    DISPLAY_NAME="Coverage"
+                  new_coverage)
+                    DISPLAY_NAME="Coverage on New Code"
                     ACTUAL="${ACTUAL}%"
                     THRESHOLD="${THRESHOLD}%"
                     ;;
-
-                  duplicated_lines_density)
-                    DISPLAY_NAME="Duplicated Lines"
+                  new_duplicated_lines_density)
+                    DISPLAY_NAME="Duplicated Lines on New Code"
                     ACTUAL="${ACTUAL}%"
                     THRESHOLD="${THRESHOLD}%"
                     ;;
-
+                  new_reliability_rating)
+                    DISPLAY_NAME="Reliability Rating on New Code"
+                    ;;
+                  new_security_rating)
+                    DISPLAY_NAME="Security Rating on New Code"
+                    ;;
+                  new_maintainability_rating)
+                    DISPLAY_NAME="Maintainability Rating on New Code"
+                    ;;
+                  new_security_hotspots_reviewed)
+                    DISPLAY_NAME="Security Hotspots Reviewed on New Code"
+                    ACTUAL="${ACTUAL}%"
+                    THRESHOLD="${THRESHOLD}%"
+                    ;;
                   bugs)
                     DISPLAY_NAME="Bugs"
                     ;;
-
                   vulnerabilities)
                     DISPLAY_NAME="Vulnerabilities"
                     ;;
-
                   security_hotspots)
                     DISPLAY_NAME="Security Hotspots"
                     ;;
-
                   code_smells)
                     DISPLAY_NAME="Code Smells"
                     ;;
-
                   *)
                     DISPLAY_NAME="$METRIC"
                     ;;
                 esac
 
                 echo "| $DISPLAY_NAME | $DISPLAY_STATUS | $ACTUAL | $THRESHOLD |"
-
               done <<< "$QUALITY_GATE_CONDITIONS"
-
             else
-
               echo "| No conditions available | UNKNOWN | N/A | N/A |"
-
             fi
 
             echo ""
 
             echo "## Analysis Configuration"
             echo ""
-
             echo "| Parameter | Configuration |"
             echo "|---|---|"
-            echo "| Project | AymanKamell_myapp-demo |"
-            echo "| Organization | aymankamel |"
+            echo "| Project | $SONAR_PROJECT_KEY |"
+            echo "| Organization | $SONAR_ORGANIZATION |"
             echo "| Branch | ${{ github.ref_name }} |"
             echo "| Analysis Type | Static Code Analysis |"
-            echo "| Quality Gate | Sonar way |"
+            echo "| Coverage Source | pytest-cov / coverage.py |"
+            echo "| Coverage Report | backend/backend-application/coverage.xml |"
             echo "| Quality Gate Enforcement | Enabled |"
             echo "| Quality Gate Timeout | 300 seconds |"
             echo ""
 
             echo "## SonarQube Cloud"
             echo ""
-            echo "[View SonarQube Project](https://sonarcloud.io/dashboard?id=AymanKamell_myapp-demo&branch=${{ github.ref_name }})"
-
+            echo "[View SonarQube Project](https://sonarcloud.io/dashboard?id=${SONAR_PROJECT_KEY}&branch=${{ github.ref_name }})"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload raw SonarQube results
