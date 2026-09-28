@@ -27,6 +27,7 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-secure:
+    if: github.event_name == 'pull_request'
     needs:
       - source-security
       - lint
@@ -37,6 +38,7 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
   rhacs-scan:
+    if: github.event_name == 'pull_request'
     needs:
       - build-secure
     uses: ./.github/workflows/rhacs-scan.yml
