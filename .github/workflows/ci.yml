@@ -27,7 +27,7 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-secure:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request'
     needs:
       - source-security
       - lint
@@ -38,7 +38,7 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
   rhacs-scan:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request'
     needs:
       - build-secure
     uses: ./.github/workflows/rhacs-scan.yml
@@ -46,3 +46,16 @@ jobs:
       image-ref: ${{ needs.build-secure.outputs.image-ref }}
     secrets:
       ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+
+  cosign:
+    if: github.event_name == 'pull_request'
+    needs:
+      - build-secure
+      - rhacs-scan
+    uses: ./.github/workflows/cosign.yml
+    with:
+      image-ref: ${{ needs.build-secure.outputs.image-ref }}
+    secrets:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
