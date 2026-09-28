@@ -48,8 +48,9 @@ jobs:
       ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
 
   cosign:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
+      - build-secure
       - rhacs-scan
     uses: ./.github/workflows/cosign.yml
     with:
