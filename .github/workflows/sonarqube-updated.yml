@@ -1,0 +1,202 @@
+name: SonarQube Cloud Analysis
+
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        required: true
+
+jobs:
+  sonarqube:
+    name: SonarQube Cloud Analysis
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_PROJECT_KEY: AymanKamell_myapp-demo
+      SONAR_ORGANIZATION: aymankamel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        id: sonarqube
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
+      - name: Fetch SonarQube metrics
+        id: metrics
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --request GET \
+            --url "${SONAR_HOST_URL}/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,coverage,duplicated_lines_density,ncloc,complexity,cognitive_complexity" \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --output sonar-metrics.json
+
+      - name: Fetch SonarQube Quality Gate
+        id: quality-gate
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --request GET \
+            --url "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}" \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --output sonar-quality-gate.json
+
+      - name: Generate SonarQube summary
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.sonarqube.outcome }}
+        run: |
+          python <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+
+          def get_metric(metrics, key):
+              for metric in metrics:
+                  if metric.get("metric") == key:
+                      return metric.get("value", "N/A")
+              return "N/A"
+
+          def format_metric(value, suffix=""):
+              if value == "N/A":
+                  return value
+              return f"{value}{suffix}"
+
+          scan_outcome = "${{ steps.sonarqube.outcome }}"
+
+          print("## SonarQube Cloud Analysis")
+          print()
+
+          print("| Quality Control | Status |")
+          print("|---|---|")
+
+          analysis_status = "PASS" if scan_outcome == "success" else "FAIL"
+
+          print(f"| SonarQube Analysis | {analysis_status} |")
+
+          try:
+              with open("sonar-quality-gate.json", "r") as file:
+                  quality_gate = json.load(file)
+
+              project_status = quality_gate.get("projectStatus", {})
+              gate_status = project_status.get("status", "UNKNOWN")
+
+              gate_display = {
+                  "OK": "PASS",
+                  "ERROR": "FAIL",
+                  "WARN": "WARN"
+              }.get(gate_status, gate_status)
+
+              print(f"| Quality Gate | {gate_display} |")
+
+          except Exception:
+              gate_status = "UNKNOWN"
+              print("| Quality Gate | UNAVAILABLE |")
+
+          print()
+          print("### Code Quality")
+          print()
+          print("| Metric | Result |")
+          print("|---|---:|")
+
+          try:
+              with open("sonar-metrics.json", "r") as file:
+                  metrics_data = json.load(file)
+
+              metrics = metrics_data.get("component", {}).get("measures", [])
+
+              print(f"| Bugs | {get_metric(metrics, 'bugs')} |")
+              print(f"| Vulnerabilities | {get_metric(metrics, 'vulnerabilities')} |")
+              print(f"| Security Hotspots | {get_metric(metrics, 'security_hotspots')} |")
+              print(f"| Code Smells | {get_metric(metrics, 'code_smells')} |")
+              print(f"| Coverage | {format_metric(get_metric(metrics, 'coverage'), '%')} |")
+              print(f"| Duplicated Lines | {format_metric(get_metric(metrics, 'duplicated_lines_density'), '%')} |")
+              print(f"| Lines of Code | {get_metric(metrics, 'ncloc')} |")
+              print(f"| Complexity | {get_metric(metrics, 'complexity')} |")
+              print(f"| Cognitive Complexity | {get_metric(metrics, 'cognitive_complexity')} |")
+
+          except Exception:
+              print("| Metrics | UNAVAILABLE |")
+
+          print()
+          print("### Quality Gate Conditions")
+          print()
+          print("| Condition | Status | Actual | Threshold |")
+          print("|---|---|---:|---:|")
+
+          try:
+              conditions = project_status.get("conditions", [])
+
+              if conditions:
+                  for condition in conditions:
+                      metric = condition.get("metricKey", "N/A")
+                      status = condition.get("status", "N/A")
+                      actual = condition.get("actualValue", "N/A")
+                      threshold = condition.get("errorThreshold", "N/A")
+
+                      print(
+                          f"| {metric} | {status} | {actual} | {threshold} |"
+                      )
+              else:
+                  print("| No conditions returned | N/A | N/A | N/A |")
+
+          except Exception:
+              print("| Conditions | UNAVAILABLE | N/A | N/A |")
+
+          print()
+          print("### Analysis Configuration")
+          print()
+          print("| Parameter | Configuration |")
+          print("|---|---|")
+          print("| Project | AymanKamell_myapp-demo |")
+          print("| Organization | aymankamel |")
+          print("| Branch | ${{ github.ref_name }} |")
+          print("| Analysis Type | Static Code Analysis |")
+          print("| Quality Gate | Sonar way |")
+          print("| Quality Gate Enforcement | Enabled |")
+          print("| Quality Gate Timeout | 300 seconds |")
+
+          print()
+          print("### SonarQube Cloud")
+          print()
+          print("[View SonarQube Project](https://sonarcloud.io/dashboard?id=AymanKamell_myapp-demo&branch=${{ github.ref_name }})")
+          PY
+
+      - name: Enforce SonarQube Quality Gate
+        if: always()
+        run: |
+          if [ "${{ steps.quality-gate.outcome }}" != "success" ]; then
+            echo "Unable to retrieve SonarQube Quality Gate status."
+            exit 1
+          fi
+
+          QUALITY_GATE_STATUS=$(jq -r '.projectStatus.status // "UNKNOWN"' sonar-quality-gate.json)
+
+          echo "SonarQube Quality Gate: $QUALITY_GATE_STATUS"
+
+          if [ "$QUALITY_GATE_STATUS" != "OK" ]; then
+            echo "SonarQube Quality Gate FAILED."
+            exit 1
+          fi
+
+          echo "SonarQube Quality Gate PASSED."
