@@ -78,32 +78,6 @@ jobs:
             echo "| HTML Test Report | GENERATED |"
             echo "| JUnit Test Results | GENERATED |"
             echo "| Coverage Report | GENERATED |"
-            echo ""
-
-            echo "### Test Results"
-            echo ""
-            echo "| Result | Count |"
-            echo "|---|---:|"
-
-            python - <<'PY'
-          import xml.etree.ElementTree as ET
-
-          root = ET.parse("junit.xml").getroot()
-
-          tests = int(root.attrib.get("tests", 0))
-          failures = int(root.attrib.get("failures", 0))
-          errors = int(root.attrib.get("errors", 0))
-          skipped = int(root.attrib.get("skipped", 0))
-          duration = root.attrib.get("time", "N/A")
-          passed = tests - failures - errors - skipped
-
-          print(f"| Total Tests | {tests} |")
-          print(f"| Passed | {passed} |")
-          print(f"| Failed | {failures} |")
-          print(f"| Errors | {errors} |")
-          print(f"| Skipped | {skipped} |")
-          print(f"| Duration | {duration}s |")
-          PY
 
             echo ""
             echo "### Individual Test Results"
