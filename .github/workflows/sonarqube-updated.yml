@@ -53,55 +53,21 @@ jobs:
         if: always()
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PULL_REQUEST: ${{ github.event.pull_request.number }}
         run: |
-          if [ -n "$PULL_REQUEST" ]; then
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --request GET \
-              --url "${SONAR_HOST_URL}/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,coverage,duplicated_lines_density,ncloc,complexity,cognitive_complexity&pullRequest=${PULL_REQUEST}" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --output sonar-metrics.json
-          else
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --request GET \
-              --url "${SONAR_HOST_URL}/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,coverage,duplicated_lines_density,ncloc,complexity,cognitive_complexity" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --output sonar-metrics.json
-          fi
-
-      - name: Fetch SonarQube Quality Gate
-        if: always()
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PULL_REQUEST: ${{ github.event.pull_request.number }}
-        run: |
-          if [ -n "$PULL_REQUEST" ]; then
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --request GET \
-              --url "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}&pullRequest=${PULL_REQUEST}" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --output sonar-quality-gate.json
-          else
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --request GET \
-              --url "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --output sonar-quality-gate.json
-          fi
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --request GET \
+            --url "${SONAR_HOST_URL}/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,coverage,duplicated_lines_density,ncloc,complexity,cognitive_complexity" \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --output sonar-metrics.json
 
       - name: Generate SonarQube summary
         if: always()
         env:
           ANALYSIS_OUTCOME: ${{ steps.sonarqube.outcome }}
-          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_NAME: ${{ github.ref_name }}
           SOURCE_BRANCH: ${{ github.head_ref }}
           TARGET_BRANCH: ${{ github.base_ref }}
         run: |
@@ -110,24 +76,18 @@ jobs:
           import os
 
           analysis_outcome = os.environ.get("ANALYSIS_OUTCOME", "unknown")
-          pull_request = os.environ.get("PULL_REQUEST", "")
+          event_name = os.environ.get("EVENT_NAME", "")
+          branch_name = os.environ.get("BRANCH_NAME", "")
           source_branch = os.environ.get("SOURCE_BRANCH", "")
           target_branch = os.environ.get("TARGET_BRANCH", "")
 
           with open("sonar-metrics.json") as f:
               metrics_data = json.load(f)
 
-          with open("sonar-quality-gate.json") as f:
-              quality_gate_data = json.load(f)
-
           measures = {
               item["metric"]: item.get("value", "N/A")
               for item in metrics_data.get("component", {}).get("measures", [])
           }
-
-          quality_gate = quality_gate_data.get("projectStatus", {})
-
-          gate_status = quality_gate.get("status", "UNKNOWN")
 
           metric_names = {
               "bugs": "Bugs",
@@ -150,7 +110,6 @@ jobs:
               f"| SonarQube Analysis | "
               f"{'PASS' if analysis_outcome == 'success' else 'FAIL'} |"
           )
-          print(f"| Quality Gate | {gate_status} |")
           print()
 
           print("### Code Quality")
@@ -159,25 +118,15 @@ jobs:
           print("|---|---:|")
 
           for key, name in metric_names.items():
-              print(f"| {name} | {measures.get(key, 'N/A')} |")
+              value = measures.get(key, "N/A")
 
-          print()
+              if key in {
+                  "coverage",
+                  "duplicated_lines_density",
+              } and value != "N/A":
+                  value = f"{value}%"
 
-          print("### Quality Gate Conditions")
-          print()
-          print("| Condition | Status | Actual | Threshold |")
-          print("|---|---|---:|---:|")
-
-          for condition in quality_gate.get("conditions", []):
-              metric = condition.get("metricKey", "N/A")
-              status = condition.get("status", "N/A")
-              actual = condition.get("actualValue", "N/A")
-              threshold = condition.get("errorThreshold", "N/A")
-
-              print(
-                  f"| {metric} | {status} | "
-                  f"{actual} | {threshold} |"
-              )
+              print(f"| {name} | {value} |")
 
           print()
 
@@ -188,15 +137,15 @@ jobs:
           print(f"| Project | {os.environ.get('SONAR_PROJECT_KEY')} |")
           print(f"| Organization | {os.environ.get('SONAR_ORGANIZATION')} |")
 
-          if pull_request:
-              print(f"| Pull Request | #{pull_request} |")
+          if event_name == "pull_request":
+              print("| Analysis Context | Pull Request |")
               print(f"| Source Branch | {source_branch} |")
               print(f"| Target Branch | {target_branch} |")
           else:
-              print(f"| Branch | {os.environ.get('GITHUB_REF_NAME')} |")
+              print(f"| Analysis Context | {event_name} |")
+              print(f"| Branch | {branch_name} |")
 
           print("| Analysis Type | Static Code Analysis |")
-          print("| Quality Gate | Sonar way |")
           print("| Quality Gate Enforcement | Enabled |")
           print("| Quality Gate Timeout | 300 seconds |")
           PY
