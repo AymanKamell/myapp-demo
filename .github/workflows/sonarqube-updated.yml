@@ -61,7 +61,7 @@ jobs:
             --url "${SONAR_HOST_URL}/api/measures/component" \
             --header "Authorization: Bearer ${SONAR_TOKEN}" \
             --data-urlencode "component=${SONAR_PROJECT_KEY}" \
-            --data-urlencode "metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,ncloc,complexity,cognitive_complexity" \
+            --data-urlencode "metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,ncloc,complexity,cognitive_complexity,coverage,new_coverage,new_lines_to_cover,new_uncovered_lines" \
             --output sonar-metrics.json
 
       - name: Generate SonarQube summary
@@ -101,6 +101,17 @@ jobs:
               "cognitive_complexity": "Cognitive Complexity",
           }
 
+          def percentage(metric):
+              value = measures.get(metric)
+
+              if value in (None, "", "N/A"):
+                  return "N/A"
+
+              try:
+                  return f"{float(value):.1f}%"
+              except (TypeError, ValueError):
+                  return value
+
           print("## SonarQube Cloud Analysis")
           print()
 
@@ -120,6 +131,24 @@ jobs:
           for key, name in metric_names.items():
               value = measures.get(key, "N/A")
               print(f"| {name} | {value} |")
+
+          print()
+
+          print("### Coverage")
+          print()
+          print("| Metric | Result |")
+          print("|---|---:|")
+
+          print(f"| Overall Coverage | {percentage('coverage')} |")
+          print(f"| Coverage on New Code | {percentage('new_coverage')} |")
+          print(
+              f"| New Lines to Cover | "
+              f"{measures.get('new_lines_to_cover', 'N/A')} |"
+          )
+          print(
+              f"| Uncovered Lines on New Code | "
+              f"{measures.get('new_uncovered_lines', 'N/A')} |"
+          )
 
           print()
 
