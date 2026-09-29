@@ -48,6 +48,7 @@ jobs:
           args: >
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+            -Dsonar.python.coverage.reportPaths=coverage/coverage.xml
 
       - name: Fetch SonarQube metrics
         if: always()
