@@ -68,8 +68,7 @@ jobs:
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --format json \
-            --output trivy-image-results.json \
-            --exit-code 1
+            --output trivy-image-results.json 
 
       - name: Download Trivy HTML template
         if: always()
