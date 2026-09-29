@@ -22,7 +22,7 @@ jobs:
   sonarqube:
     needs:
       - test
-    uses: ./.github/workflows/sonarqube.yml
+    uses: ./.github/workflows/sonarqube-updated.yml
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
