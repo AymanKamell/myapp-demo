@@ -23,6 +23,9 @@ jobs:
     needs:
       - test
     uses: ./.github/workflows/sonarqube-updated.yml
+    permissions:
+      contents: read
+      actions: read
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
