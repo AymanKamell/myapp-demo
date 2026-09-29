@@ -53,41 +53,16 @@ jobs:
         if: always()
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BRANCH_NAME: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
-          METRICS="bugs,new_bugs,vulnerabilities,new_vulnerabilities,security_hotspots,new_security_hotspots,code_smells,new_code_smells,coverage,new_coverage,duplicated_lines_density,new_duplicated_lines_density,ncloc,new_lines,complexity,cognitive_complexity"
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --get \
-              --url "${SONAR_HOST_URL}/api/measures/component" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --data-urlencode "component=${SONAR_PROJECT_KEY}" \
-              --data-urlencode "metricKeys=${METRICS}" \
-              --data-urlencode "pullRequest=${PR_NUMBER}" \
-              --output sonar-metrics.json
-          else
-            curl --fail-with-body \
-              --silent \
-              --show-error \
-              --get \
-              --url "${SONAR_HOST_URL}/api/measures/component" \
-              --header "Authorization: Bearer ${SONAR_TOKEN}" \
-              --data-urlencode "component=${SONAR_PROJECT_KEY}" \
-              --data-urlencode "metricKeys=${METRICS}" \
-              --data-urlencode "branch=${BRANCH_NAME}" \
-              --output sonar-metrics.json
-          fi
-
-      - name: Inspect SonarQube metrics
-        if: always()
-        run: |
-          echo "SonarQube API response:"
-          jq . sonar-metrics.json
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --get \
+            --url "${SONAR_HOST_URL}/api/measures/component" \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "component=${SONAR_PROJECT_KEY}" \
+            --data-urlencode "metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,coverage,duplicated_lines_density,ncloc,complexity,cognitive_complexity" \
+            --output sonar-metrics.json
 
       - name: Generate SonarQube summary
         if: always()
@@ -118,19 +93,12 @@ jobs:
 
           metric_names = {
               "bugs": "Bugs",
-              "new_bugs": "New Bugs",
               "vulnerabilities": "Vulnerabilities",
-              "new_vulnerabilities": "New Vulnerabilities",
               "security_hotspots": "Security Hotspots",
-              "new_security_hotspots": "New Security Hotspots",
               "code_smells": "Code Smells",
-              "new_code_smells": "New Code Smells",
               "coverage": "Coverage",
-              "new_coverage": "Coverage on New Code",
               "duplicated_lines_density": "Duplicated Lines",
-              "new_duplicated_lines_density": "Duplicated Lines on New Code",
               "ncloc": "Lines of Code",
-              "new_lines": "New Lines",
               "complexity": "Complexity",
               "cognitive_complexity": "Cognitive Complexity",
           }
@@ -156,9 +124,7 @@ jobs:
 
               if key in {
                   "coverage",
-                  "new_coverage",
                   "duplicated_lines_density",
-                  "new_duplicated_lines_density",
               } and value != "N/A":
                   value = f"{value}%"
 
