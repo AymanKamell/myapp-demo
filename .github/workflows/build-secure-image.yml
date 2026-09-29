@@ -69,7 +69,7 @@ jobs:
             --ignore-unfixed \
             --format json \
             --output trivy-image-results.json \
-            --exit-code 0
+            --exit-code 1
 
       - name: Download Trivy HTML template
         if: always()
@@ -135,28 +135,6 @@ jobs:
             echo "| HTML Report | trivy-image-results.html |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Enforce Trivy security gate
-        run: |
-          CRITICAL=$(jq \
-            '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' \
-            trivy-image-results.json)
-
-          HIGH=$(jq \
-            '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' \
-            trivy-image-results.json)
-
-          TOTAL=$((CRITICAL + HIGH))
-
-          echo "CRITICAL vulnerabilities: $CRITICAL"
-          echo "HIGH vulnerabilities: $HIGH"
-          echo "TOTAL vulnerabilities: $TOTAL"
-
-          if [ "$TOTAL" -gt 0 ]; then
-            echo "Trivy security gate FAILED."
-            exit 1
-          fi
-
-          echo "Trivy security gate PASSED."
 
       - name: Generate SBOM
         id: sbom
