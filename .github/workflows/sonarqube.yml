@@ -5,7 +5,7 @@ on:
     secrets:
       SONAR_TOKEN:
         required: true
-        
+
 jobs:
   sonarqube:
     name: SonarQube Cloud Analysis
@@ -13,12 +13,31 @@ jobs:
 
     permissions:
       contents: read
+      actions: read
+
+    env:
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_PROJECT_KEY: AymanKamell_myapp-demo
+      SONAR_ORGANIZATION: aymankamel
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v7
+        with:
+          name: python-coverage
+          path: backend/backend-application
+
+      - name: Verify coverage report
+        run: |
+          test -f backend/backend-application/coverage.xml
+
+          echo "Coverage report:"
+          ls -lh backend/backend-application/coverage.xml
 
       - name: SonarQube Scan
         id: sonarqube
@@ -30,30 +49,96 @@ jobs:
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
 
+      - name: Fetch SonarQube metrics
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --get \
+            --url "${SONAR_HOST_URL}/api/measures/component" \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "component=${SONAR_PROJECT_KEY}" \
+            --data-urlencode "metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,ncloc,complexity,cognitive_complexity" \
+            --output sonar-metrics.json
+
       - name: Generate SonarQube summary
         if: always()
+        env:
+          ANALYSIS_OUTCOME: ${{ steps.sonarqube.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          TARGET_BRANCH: ${{ github.base_ref }}
         run: |
-          {
-            echo "## SonarQube Cloud Analysis"
-            echo ""
-            echo "| Quality Control | Status |"
-            echo "|---|---|"
-            echo "| SonarQube Analysis | ${{ steps.sonarqube.outcome == 'success' && 'PASS' || 'FAIL' }} |"
-            echo "| Quality Gate | ${{ steps.sonarqube.outcome == 'success' && 'PASS' || 'FAIL' }} |"
-            echo ""
-            echo "### Analysis Configuration"
-            echo ""
-            echo "| Parameter | Configuration |"
-            echo "|---|---|"
-            echo "| Project | AymanKamell_myapp-demo |"
-            echo "| Organization | aymankamel |"
-            echo "| Branch | ${{ github.ref_name }} |"
-            echo "| Analysis Type | Static Code Analysis |"
-            echo "| Quality Gate | Sonar way |"
-            echo "| Quality Gate Enforcement | Enabled |"
-            echo "| Quality Gate Timeout | 300 seconds |"
-            echo ""
-            echo "### SonarQube Cloud"
-            echo ""
-            echo "[View SonarQube Project](https://sonarcloud.io/dashboard?id=AymanKamell_myapp-demo&branch=${{ github.ref_name }})"
-          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          analysis_outcome = os.environ.get("ANALYSIS_OUTCOME", "unknown")
+          event_name = os.environ.get("EVENT_NAME", "")
+          branch_name = os.environ.get("BRANCH_NAME", "")
+          source_branch = os.environ.get("SOURCE_BRANCH", "")
+          target_branch = os.environ.get("TARGET_BRANCH", "")
+
+          with open("sonar-metrics.json") as f:
+              metrics_data = json.load(f)
+
+          measures = {
+              item["metric"]: item.get("value", "N/A")
+              for item in metrics_data.get("component", {}).get("measures", [])
+          }
+
+          metric_names = {
+              "bugs": "Bugs",
+              "vulnerabilities": "Vulnerabilities",
+              "security_hotspots": "Security Hotspots",
+              "code_smells": "Code Smells",
+              "ncloc": "Lines of Code",
+              "complexity": "Complexity",
+              "cognitive_complexity": "Cognitive Complexity",
+          }
+
+          print("## SonarQube Cloud Analysis")
+          print()
+
+          print("| Quality Control | Status |")
+          print("|---|---|")
+          print(
+              f"| SonarQube Analysis | "
+              f"{'PASS' if analysis_outcome == 'success' else 'FAIL'} |"
+          )
+          print()
+
+          print("### Code Quality")
+          print()
+          print("| Metric | Result |")
+          print("|---|---:|")
+
+          for key, name in metric_names.items():
+              value = measures.get(key, "N/A")
+              print(f"| {name} | {value} |")
+
+          print()
+
+          print("### Analysis Configuration")
+          print()
+          print("| Parameter | Configuration |")
+          print("|---|---|")
+          print(f"| Project | {os.environ.get('SONAR_PROJECT_KEY')} |")
+          print(f"| Organization | {os.environ.get('SONAR_ORGANIZATION')} |")
+
+          if event_name == "pull_request":
+              print("| Analysis Context | Pull Request |")
+              print(f"| Source Branch | {source_branch} |")
+              print(f"| Target Branch | {target_branch} |")
+          else:
+              print(f"| Analysis Context | {event_name} |")
+              print(f"| Branch | {branch_name} |")
+
+          print("| Analysis Type | Static Code Analysis |")
+          print("| Quality Gate Enforcement | Enabled |")
+          print("| Quality Gate Timeout | 300 seconds |")
+          PY
