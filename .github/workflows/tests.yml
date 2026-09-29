@@ -36,7 +36,8 @@ jobs:
             --cov-report=xml:coverage.xml \
             --cov-report=term-missing \
             --html=pytest-report.html \
-            --self-contained-html
+            --self-contained-html \
+            --junitxml=junit.xml
 
       - name: Upload test report
         if: always()
@@ -44,6 +45,14 @@ jobs:
         with:
           name: pytest-html-report
           path: backend/backend-application/pytest-report.html
+          if-no-files-found: error
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: junit-test-results
+          path: backend/backend-application/junit.xml
           if-no-files-found: error
 
       - name: Upload coverage report
@@ -67,7 +76,40 @@ jobs:
             echo "|---|---|"
             echo "| Unit Tests | ${TEST_OUTCOME^^} |"
             echo "| HTML Test Report | GENERATED |"
+            echo "| JUnit Test Results | GENERATED |"
             echo "| Coverage Report | GENERATED |"
+
+            echo ""
+            echo "### Individual Test Results"
+            echo ""
+            echo "| Test | Class | Status | Duration |"
+            echo "|---|---|---|---:|"
+
+            python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("junit.xml").getroot()
+
+          for testcase in root.iter("testcase"):
+              name = testcase.attrib.get("name", "")
+              classname = testcase.attrib.get("classname", "")
+              duration = testcase.attrib.get("time", "0")
+
+              if testcase.find("failure") is not None:
+                  status = "FAILED"
+              elif testcase.find("error") is not None:
+                  status = "ERROR"
+              elif testcase.find("skipped") is not None:
+                  status = "SKIPPED"
+              else:
+                  status = "PASSED"
+
+              name = name.replace("|", "\\|")
+              classname = classname.replace("|", "\\|")
+
+              print(f"| {name} | {classname} | {status} | {duration}s |")
+          PY
+
             echo ""
             echo "### Test Configuration"
             echo ""
@@ -80,5 +122,6 @@ jobs:
             echo "| Coverage Report | coverage.xml |"
             echo "| Test Report Format | HTML |"
             echo "| Test Report Artifact | pytest-html-report |"
+            echo "| JUnit Results Artifact | junit-test-results |"
             echo "| Coverage Artifact | python-coverage |"
           } >> "$GITHUB_STEP_SUMMARY"
