@@ -126,7 +126,6 @@ jobs:
           }
 
           quality_gate = quality_gate_data.get("projectStatus", {})
-
           gate_status = quality_gate.get("status", "UNKNOWN")
 
           metric_names = {
@@ -134,8 +133,8 @@ jobs:
               "vulnerabilities": "Vulnerabilities",
               "security_hotspots": "Security Hotspots",
               "code_smells": "Code Smells",
-              "coverage": "Coverage",
-              "duplicated_lines_density": "Duplicated Lines",
+              "coverage": "Overall Coverage",
+              "duplicated_lines_density": "Overall Duplicated Lines",
               "ncloc": "Lines of Code",
               "complexity": "Complexity",
               "cognitive_complexity": "Cognitive Complexity",
@@ -153,40 +152,84 @@ jobs:
           print(f"| Quality Gate | {gate_status} |")
           print()
 
-          print("### Code Quality")
+          print("### Overall Code Quality")
           print()
           print("| Metric | Result |")
           print("|---|---:|")
 
           for key, name in metric_names.items():
-              print(f"| {name} | {measures.get(key, 'N/A')} |")
+              value = measures.get(key, "N/A")
+
+              if key == "coverage" and value != "N/A":
+                  value = f"{value}%"
+
+              elif key == "duplicated_lines_density" and value != "N/A":
+                  value = f"{value}%"
+
+              print(f"| {name} | {value} |")
 
           print()
 
-          print("### Quality Gate Conditions")
+          print("### Quality Gate Conditions - New Code")
           print()
           print("| Condition | Status | Actual | Threshold |")
           print("|---|---|---:|---:|")
 
-          for condition in quality_gate.get("conditions", []):
+          conditions = quality_gate.get("conditions", [])
+
+          for condition in conditions:
               metric = condition.get("metricKey", "N/A")
               status = condition.get("status", "N/A")
               actual = condition.get("actualValue", "N/A")
               threshold = condition.get("errorThreshold", "N/A")
 
+              condition_names = {
+                  "new_reliability_rating": "New Reliability Rating",
+                  "new_security_rating": "New Security Rating",
+                  "new_maintainability_rating": "New Maintainability Rating",
+                  "new_security_hotspots_reviewed": "New Security Hotspots Reviewed",
+                  "new_coverage": "New Coverage",
+                  "new_duplicated_lines_density": "New Duplicated Lines",
+              }
+
+              display_name = condition_names.get(metric, metric)
+
+              if metric == "new_coverage" and actual != "N/A":
+                  actual = f"{actual}%"
+                  threshold = f"{threshold}%"
+
+              elif metric == "new_duplicated_lines_density" and actual != "N/A":
+                  actual = f"{actual}%"
+                  threshold = f"{threshold}%"
+
+              elif metric == "new_security_hotspots_reviewed" and actual != "N/A":
+                  actual = f"{actual}%"
+                  threshold = f"{threshold}%"
+
               print(
-                  f"| {metric} | {status} | "
+                  f"| {display_name} | {status} | "
                   f"{actual} | {threshold} |"
               )
 
+          print()
+
+          print("### Rating Reference")
+          print()
+          print("| Rating | SonarQube Meaning |")
+          print("|---|---|")
+          print("| 1 | A |")
+          print("| 2 | B |")
+          print("| 3 | C |")
+          print("| 4 | D |")
+          print("| 5 | E |")
           print()
 
           print("### Analysis Configuration")
           print()
           print("| Parameter | Configuration |")
           print("|---|---|")
-          print(f"| Project | {os.environ.get('SONAR_PROJECT_KEY')} |")
-          print(f"| Organization | {os.environ.get('SONAR_ORGANIZATION')} |")
+          print("| Project | AymanKamell_myapp-demo |")
+          print("| Organization | aymankamel |")
 
           if pull_request:
               print(f"| Pull Request | #{pull_request} |")
