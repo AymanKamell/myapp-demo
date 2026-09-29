@@ -65,10 +65,9 @@ jobs:
       - name: Generate lint summary
         if: always()
         env:
-          RUFF_EXIT_CODE: ${{ steps.ruff.outputs.exit_code }}
           VIOLATIONS: ${{ steps.lint-results.outputs.violations }}
         run: |
-          if [ "$RUFF_EXIT_CODE" = "0" ]; then
+          if [ "$VIOLATIONS" -eq 0 ]; then
             STATUS="PASS"
             GATE="PASSED"
           else
@@ -92,6 +91,6 @@ jobs:
             echo ""
             echo "| Artifact | Status |"
             echo "|---|---|"
-            echo "| ruff-lint-report | GENERATED |"
+            echo "| ruff-lint-report.json | GENERATED |"
             echo "| ruff-lint-report.html | GENERATED |"
           } >> "$GITHUB_STEP_SUMMARY"
