@@ -1,451 +1,488 @@
-# 🔐 DevSecOps CI/CD Pipeline
+# DevSecOps CI/CD Pipeline
 
-A **DevSecOps CI/CD reference architecture** using GitHub, GitHub Actions, container security tools, Cosign, and OpenShift/Kubernetes.
+## 1. Overview
 
-The pipeline integrates security throughout the software delivery lifecycle, from source code analysis to container security, software supply-chain protection, deployment, and runtime security.
+This project implements an enterprise-oriented CI/CD pipeline that integrates software quality, security, supply-chain protection, container security, image signing, and GitOps-based deployment.
 
-> **Core principle:** Every stage validates the artifact before allowing it to move to the next stage.
+The pipeline is designed to provide security and quality controls throughout the software delivery lifecycle, from source-code changes through application deployment.
 
----
+The architecture separates continuous integration from continuous deployment.
 
-# 🏗️ Architecture
+GitHub Actions is responsible for building, testing, scanning, validating, signing, and promoting application artifacts.
 
+The GitOps repository represents the desired deployment state.
 
-<img width="423" height="715" alt="image" src="https://github.com/user-attachments/assets/55cf2f50-bded-4ebe-a150-39d2c3387b56" />
+Argo CD continuously monitors the GitOps repository and reconciles the OpenShift environment with the desired state stored in Git.
 
-
----
-
-# 🔄 Pipeline Stages
-
-## 1️⃣ 📦 Source — GitHub
-
-The software delivery process starts with the source code stored in the GitHub repository.
-
-Changes trigger GitHub Actions, which orchestrates the CI/CD pipeline and its security controls.
+Red Hat Advanced Cluster Security for Kubernetes provides additional container and runtime security controls.
 
 ---
 
-## 2️⃣ 🧪 Unit Testing
+# 2. Pipeline Architecture
 
-Automated tests validate the application's functionality.
+The overall delivery process follows this sequence:
 
-The pipeline should stop when the required tests fail.
-
-```text
-Source Code
-    │
-    ▼
-🧪 Unit Tests
-    │
-    ▼
-Continue / Stop
-```
+<img width="340" height="647" alt="image" src="https://github.com/user-attachments/assets/0d28e457-24ce-4333-b05a-02005422e718" />
 
 ---
 
-## 3️⃣ 🔎 SonarQube — SAST & Code Quality
+# 3. Source Security
 
-SonarQube performs static analysis of the application source code.
+The source security stage performs security analysis against the application source before the application is built and promoted.
 
-It focuses on source-level issues such as:
+The stage includes vulnerability analysis of the source filesystem and dependency content.
 
-* 🐛 Bugs
-* 🔐 Security vulnerabilities
-* 🧹 Code smells
-* 🔁 Code duplication
-* 📐 Maintainability issues
-* 📊 Code quality
+It also performs secret detection to identify credentials, tokens, private keys, passwords, and other sensitive information that may have been accidentally committed to the repository.
 
-**Purpose:** Analyze the quality and security of the application source code.
+The purpose of this stage is to identify security issues as early as possible in the development lifecycle.
+
+A failed security control prevents the application from progressing through the pipeline.
 
 ---
 
-## 4️⃣ 🔑 Gitleaks — Secret Detection
+# 4. Automated Unit Testing
 
-Gitleaks analyzes the source code and repository history for accidentally exposed secrets.
+The testing stage executes the application's automated unit tests.
 
-Its purpose is to identify credential-like information such as:
+Unit testing verifies that individual application components behave according to their expected functionality.
 
-* API keys
-* Access tokens
-* Passwords
-* Private keys
-* Other sensitive credentials
+The test stage provides an automated validation mechanism that runs consistently for every applicable pipeline execution.
 
-**Purpose:** Prevent secrets from progressing through the software delivery pipeline.
+The test results are evaluated as part of the pipeline gate.
+
+If the required tests fail, subsequent delivery stages are prevented from progressing.
 
 ---
 
-## 5️⃣ 🛡️ Trivy FS — Filesystem & Dependency Scanning
+# 5. Code Coverage
 
-Trivy filesystem scanning analyzes the source filesystem and application dependencies for known security vulnerabilities.
+Code coverage measures the amount of application code exercised by the automated tests.
 
-**Purpose:** Identify vulnerable dependencies and components before creating the container artifact.
+The coverage result provides visibility into how extensively the test suite exercises the application.
 
----
+Coverage information is also made available to the static analysis platform so that code quality analysis can consider test coverage as part of the overall quality assessment.
 
-# 🚦 6️⃣ Source Security Gate
-
-The source code must pass the required source-level controls before the container image is built.
-
-```text
-🧪 Unit Tests
-      │
-      ▼
-🔎 SonarQube
-      │
-      ▼
-🔑 Gitleaks
-      │
-      ▼
-🛡️ Trivy FS
-      │
-      ▼
-🚦 SOURCE SECURITY GATE
-```
-
-A failed security or quality requirement stops the pipeline from proceeding to the image stage.
+Coverage reports are generated and retained as pipeline artifacts for later inspection.
 
 ---
 
-# 🐳 7️⃣ Build Container Image
+# 6. Code Linting
 
-After the source security gate succeeds, the application is packaged into a container image.
+The linting stage performs automated analysis of the source code according to the language and project coding standards.
 
-```text
-Source Security Gate
-        │
-        ▼
-🐳 Build Container Image
-        │
-        ▼
-Container Artifact
-```
+Linting identifies issues such as:
 
-The resulting image becomes the primary artifact for the next security stages.
+* Syntax and formatting problems
+* Unused code
+* Code-quality violations
+* Potential programming errors
+* Violations of configured coding rules
 
----
+The linting result is evaluated as a quality gate.
 
-# 🔍 8️⃣ Trivy Image Scan
+A failed linting gate prevents the pipeline from progressing.
 
-The built container image is scanned using Trivy.
-
-Unlike filesystem scanning, this scan targets the **actual container image** and its contents.
-
-The scan can identify known vulnerabilities in:
-
-* Operating-system packages
-* Application dependencies
-* Software components contained in the image
-
-**Purpose:** Determine whether the built container artifact contains known vulnerabilities.
+A machine-readable report and a human-readable report are generated and retained as pipeline artifacts.
 
 ---
 
-# 🛡️ 9️⃣ RHACS / `roxctl` Image Analysis
+# 7. Static Code Analysis
 
-The built image is also analyzed using RHACS through `roxctl`.
+The static analysis stage evaluates the source code without executing the application.
 
-This adds RHACS security analysis and policy evaluation to the image-security stage.
+The analysis identifies potential code-quality and maintainability issues and provides additional software quality metrics.
 
-```text
-🐳 Container Image
-       │
-       ├── 🔍 Trivy
-       │
-       └── 🛡️ RHACS / roxctl
-```
+The analysis platform also consumes the generated test coverage information.
 
-**Purpose:** Evaluate the image according to the organization's RHACS security requirements.
+A Quality Gate is used to determine whether the analyzed code meets the configured quality requirements.
+
+The pipeline waits for the Quality Gate result before continuing.
+
+A failed Quality Gate prevents the application from progressing to the subsequent build and security stages.
 
 ---
 
-# 📜 🔟 Generate SBOM
+# 8. Application Build
 
-After the image successfully passes the required image-security checks, an **SBOM (Software Bill of Materials)** is generated.
+After the source, test, and quality controls have passed, the application is built into its deployable form.
 
-The SBOM provides an inventory of the software components contained within the artifact.
+For containerized workloads, this stage produces the container image that will subsequently be scanned and promoted.
 
-```text
-🐳 Container Image
-       │
-       ▼
-📜 SBOM
-       │
-       └── Software Components
-```
-
-The SBOM is a software inventory rather than a vulnerability scan.
-
-**Purpose:** Provide visibility into the components that make up the software artifact.
+The image is associated with the source revision that produced it, providing traceability between the source code and the resulting artifact.
 
 ---
 
-# 🚦 1️⃣1️⃣ Image Security Gate
+# 9. Container Image Vulnerability Scanning
 
-The container artifact must successfully pass the required image-security controls before proceeding to the software supply-chain stage.
+The container image is scanned for known vulnerabilities before it is promoted for deployment.
 
-```text
-🐳 Build Image
-      │
-      ▼
-🔍 Trivy Image
-      │
-      ▼
-🛡️ RHACS / roxctl
-      │
-      ▼
-📜 SBOM
-      │
-      ▼
-🚦 IMAGE SECURITY GATE
-```
+The scan evaluates the operating system packages, application dependencies, and other components contained within the image.
 
-Only a successful result allows the artifact to proceed.
+The pipeline applies the configured severity policy to determine whether detected vulnerabilities are acceptable.
+
+High and critical vulnerabilities are evaluated against the configured security gate.
+
+The scan generates both structured and human-readable results.
+
+The reports are retained as pipeline artifacts.
+
+If the configured security gate fails, the image is not promoted to the subsequent supply-chain stages.
 
 ---
 
-# ✍️ 1️⃣2️⃣ Cosign Image Signing
+# 10. Software Bill of Materials
 
-After the image passes the security requirements, Cosign signs the container image.
+The pipeline generates a Software Bill of Materials for the container image.
 
-The cryptographic signature establishes trust in the artifact and provides a mechanism for verifying its authenticity and integrity.
+The SBOM provides an inventory of the software components and dependencies contained within the image.
 
-```text
-Container Image
-      │
-      ▼
-✍️ Cosign Sign
-      │
-      ▼
-Image Signature
-```
+The SBOM improves software supply-chain visibility and provides information that can be used for vulnerability management, compliance, incident response, and component tracking.
 
-The image should be associated with an immutable artifact identity, such as its digest, when performing signing and verification.
+The generated SBOM is retained as a pipeline artifact.
+
+The SBOM is subsequently used as part of the image attestation process.
 
 ---
 
-# 📜 1️⃣3️⃣ SBOM Attestation
+# 11. Container Image Registry
 
-The generated SBOM is attached to the container image as a **Cosign attestation**.
+After the image passes the required container security controls, it is pushed to the configured container registry.
 
-This associates the SBOM with the specific software artifact.
+The registry stores the container image and provides an immutable digest that identifies the exact image content.
 
-```text
-Container Image
-      │
-      ├── ✍️ Signature
-      │
-      └── 📜 SBOM Attestation
-```
+The deployment process uses the image digest rather than relying solely on a mutable image tag.
 
-**Purpose:** Provide verifiable metadata about the software components contained in the artifact.
+This ensures that the image deployed to the environment corresponds to the exact artifact that passed the pipeline controls.
 
 ---
 
-# 🚦 1️⃣4️⃣ Supply Chain Security Gate
+# 12. Immutable Image Identification
 
-At this stage, the artifact has completed the required supply-chain security controls.
+The pipeline uses the image digest as the immutable identifier for deployment.
 
-```text
-🔍 Image Security
-      │
-      ▼
-📜 SBOM
-      │
-      ▼
-✍️ Image Signature
-      │
-      ▼
-📜 SBOM Attestation
-      │
-      ▼
-🚦 SUPPLY CHAIN GATE
-```
+A container image tag can potentially be moved to different image content.
 
-Only artifacts that satisfy the required controls should proceed to publication.
+A digest, however, identifies a specific image manifest and its associated content.
+
+Using the digest in the GitOps configuration provides deterministic deployment behavior.
+
+The GitOps repository therefore records exactly which image artifact should be deployed.
 
 ---
 
-# 📤 1️⃣5️⃣ Push to Container Registry
+# 13. RHACS Image Security Validation
 
-The validated and signed image is pushed to the container registry.
+Red Hat Advanced Cluster Security for Kubernetes is integrated into the CI/CD process to evaluate the container image against configured security policies.
 
-The registry stores the container artifact together with its associated supply-chain metadata.
+The image is checked before it is promoted for deployment.
 
-```text
-Validated Artifact
-      │
-      ▼
-📤 Container Registry
-```
+RHACS evaluates the image against the applicable build-stage policies and returns the policy evaluation result to the pipeline.
 
-The registry therefore becomes the source of the artifact used by downstream deployment processes.
+The pipeline uses the RHACS result as a security gate.
 
----
+If the image violates a required RHACS policy, the pipeline fails and the deployment process does not proceed.
 
-# 🔐 1️⃣6️⃣ Verify Artifact
-
-Before deployment, the image signature and associated attestations can be verified.
-
-```text
-📤 Container Registry
-        │
-        ▼
-🔐 Verify Signature
-        │
-        ▼
-📜 Verify Attestation
-```
-
-Verification ensures that the artifact satisfies the expected trust requirements before it is deployed.
+The RHACS policy results are generated in structured and human-readable formats and retained as pipeline artifacts.
 
 ---
 
-# 🛡️ 1️⃣7️⃣ Policy Enforcement
+# 14. Image Signing
 
-Deployment policies enforce organizational security requirements.
+After the image passes the required security controls, the image is cryptographically signed using Cosign.
 
-Policy enforcement can validate requirements such as:
+Image signing establishes a verifiable relationship between the image artifact and the trusted signing identity.
 
-* 🔐 Trusted image signatures
-* 📦 Trusted image sources
-* 🛡️ Vulnerability requirements
-* 📜 Required attestations
-* 🚫 Unauthorized artifacts
+The signature allows downstream systems to verify that the image was produced and signed by an authorized source.
 
-This establishes an important distinction:
+The signing private key is protected using the CI/CD platform's secret-management mechanism and is not stored in the source repository.
 
-> **Security scanning identifies security issues, while policy enforcement determines whether an artifact is allowed to proceed.**
+The corresponding public key is used for signature verification.
 
 ---
 
-# 🚀 1️⃣8️⃣ Deployment
+# 15. SBOM Attestation
 
-Once the artifact passes verification and policy enforcement, it can be deployed to the Kubernetes/OpenShift environment.
+The generated SBOM is attached to the container image through a Cosign attestation.
 
-```text
-🔐 Verification
-      │
-      ▼
-🛡️ Policy Enforcement
-      │
-      ▼
-🚀 Kubernetes / OpenShift
-```
+The attestation provides a verifiable association between the image and the SBOM describing its contents.
+
+The pipeline verifies the generated attestation after creation.
+
+This provides an additional software supply-chain control by allowing downstream systems to verify that the image has an associated signed SBOM.
 
 ---
 
-# 👁️ 1️⃣9️⃣ Runtime Security
+# 16. Signature Verification
 
-Security continues after deployment.
+After signing, the pipeline verifies the image signature using the configured public key.
 
-RHACS provides runtime security and visibility for workloads running in the Kubernetes/OpenShift environment.
+The verification confirms that the image has a valid signature corresponding to the expected signing key.
 
-The runtime security layer provides visibility and controls across areas such as:
+Both signing and verification are performed as part of the pipeline.
 
-* Workloads
-* Vulnerabilities
-* Kubernetes configuration
-* Network activity
-* Policy violations
-* Runtime behavior
-
-```text
-🚀 Kubernetes / OpenShift
-          │
-          ▼
-      👁️ RHACS
-          │
-          ▼
-   Runtime Security
-```
+This prevents the pipeline from promoting an artifact when the expected cryptographic verification cannot be completed successfully.
 
 ---
 
-# 🧩 Security Layers
+# 17. RHACS Cosign Signature Policy
 
-The architecture can be divided into four major security layers:
+RHACS contains a configured image security policy named:
 
-| Layer                        | Tools                         | Purpose                                          |
-| ---------------------------- | ----------------------------- | ------------------------------------------------ |
-| 🔐 **Source Security**       | SonarQube, Gitleaks, Trivy FS | Secure and validate source code                  |
-| 🐳 **Artifact Security**     | Trivy Image, RHACS, SBOM      | Analyze and document the container artifact      |
-| 🔗 **Supply Chain Security** | Cosign, SBOM Attestation      | Establish artifact trust and verifiable metadata |
-| 👁️ **Runtime Security**     | RHACS                         | Protect and monitor deployed workloads           |
+**Require Cosign Signuture**
 
----
+This policy requires applicable container images to satisfy the configured Cosign signature requirement.
 
-# 🚦 Security Gates
+The policy provides an additional security layer beyond the CI/CD pipeline.
 
-The pipeline contains three major security gates.
+The CI/CD pipeline signs and verifies the image before it is promoted.
 
-### 🚦 Source Security Gate
+RHACS subsequently evaluates the image against the configured signature policy when the image is used in the OpenShift environment.
 
-```text
-🧪 Unit Tests
-      ↓
-🔎 SonarQube
-      ↓
-🔑 Gitleaks
-      ↓
-🛡️ Trivy FS
-      ↓
-🚦 PASS / FAIL
-```
+This establishes a supply-chain trust model in which unsigned or improperly signed images can be prevented from being admitted according to the configured RHACS enforcement settings.
 
-### 🚦 Image Security Gate
-
-```text
-🐳 Build Image
-      ↓
-🔍 Trivy Image
-      ↓
-🛡️ RHACS / roxctl
-      ↓
-📜 Generate SBOM
-      ↓
-🚦 PASS / FAIL
-```
-
-### 🚦 Supply Chain Gate
-
-```text
-✍️ Sign Image
-      ↓
-📜 Attest SBOM
-      ↓
-📤 Publish Artifact
-      ↓
-🔐 Verify
-      ↓
-🛡️ Enforce Policy
-      ↓
-🚦 PASS / FAIL
-      ↓
-🚀 Deploy
-```
+The policy also provides visibility into image-signature compliance through the RHACS console.
 
 ---
 
-# 🧰 Tool Responsibilities
+# 18. GitOps Deployment
 
-| Tool                       | Responsibility                                    |
-| -------------------------- | ------------------------------------------------- |
-| 🧪 **Unit Tests**          | Validate application functionality                |
-| 🔎 **SonarQube**           | Static analysis and code quality                  |
-| 🔑 **Gitleaks**            | Secret detection                                  |
-| 🛡️ **Trivy FS**           | Filesystem and dependency vulnerability scanning  |
-| 🐳 **Container Build**     | Create the container artifact                     |
-| 🔍 **Trivy Image**         | Container image vulnerability scanning            |
-| 🛡️ **RHACS / roxctl**     | Container security analysis and policy evaluation |
-| 📜 **Syft / Trivy**        | SBOM generation                                   |
-| ✍️ **Cosign**              | Container image signing                           |
-| 📜 **Cosign Attestation**  | SBOM attestation                                  |
-| 📤 **Container Registry**  | Artifact storage                                  |
-| 🔐 **Cosign Verification** | Signature and attestation verification            |
-| 🛡️ **RHACS / Kyverno**    | Deployment policy enforcement                     |
-| 👁️ **RHACS**              | Runtime security                                  |
+The deployment stage follows a GitOps model.
+
+Instead of directly modifying the OpenShift environment from the CI/CD pipeline, the pipeline updates the desired deployment state in the GitOps repository.
+
+The update contains the immutable image digest associated with the validated container image.
+
+The change is committed to Git, providing an auditable record of the deployment change.
+
+Git therefore becomes the source of truth for the desired application state.
+
+---
+
+# 19. GitOps Repository
+
+The GitOps repository contains the Kubernetes deployment configuration required to run the application.
+
+It represents the desired state of the environment independently from the application source repository.
+
+Application source changes are therefore separated from deployment configuration changes.
+
+Every deployment change can be traced through Git history, including the image digest that was promoted.
+
+---
+
+# 20. Argo CD Automated Synchronization
+
+Argo CD monitors the GitOps repository for changes.
+
+When the desired state stored in Git changes, Argo CD detects the new Git revision.
+
+Automated synchronization causes Argo CD to reconcile the OpenShift environment with the new desired state.
+
+This removes the requirement for a manual deployment command after the GitOps repository has been updated.
+
+Argo CD continuously maintains the relationship between the desired state in Git and the actual state running in OpenShift.
+
+---
+
+# 21. OpenShift Deployment
+
+OpenShift is the runtime platform where the application workload is deployed.
+
+Argo CD applies the desired state represented in the GitOps repository.
+
+The deployment uses the immutable container image digest produced by the CI/CD process.
+
+OpenShift performs the resulting workload rollout and maintains the application according to the declared Kubernetes resources.
+
+---
+
+# 22. Deployment Reconciliation
+
+The deployment process is based on continuous reconciliation rather than a one-time deployment command.
+
+The desired state is stored in Git.
+
+Argo CD compares the desired state with the actual state of the OpenShift environment.
+
+If a difference is detected, Argo CD can synchronize the environment according to the configured synchronization policy.
+
+This provides continuous desired-state management.
+
+---
+
+# 23. Generated Reports and Artifacts
+
+The pipeline generates reports throughout the software delivery lifecycle.
+
+| Stage              | Generated Artifact              | Purpose                                         |
+| ------------------ | ------------------------------- | ----------------------------------------------- |
+| Unit Testing       | Test Report                     | Provides detailed automated test results        |
+| Unit Testing       | Coverage Report                 | Provides code coverage information              |
+| Linting            | Structured Lint Report          | Provides machine-readable linting results       |
+| Linting            | HTML Lint Report                | Provides human-readable linting results         |
+| Container Scanning | Structured Vulnerability Report | Provides machine-readable vulnerability results |
+| Container Scanning | HTML Vulnerability Report       | Provides human-readable vulnerability results   |
+| SBOM               | SPDX SBOM                       | Provides a software component inventory         |
+| RHACS              | Structured Policy Report        | Provides machine-readable RHACS policy results  |
+| RHACS              | HTML Policy Report              | Provides human-readable RHACS policy results    |
+
+The generated artifacts are retained with the corresponding pipeline execution.
+
+This provides traceability and allows security, quality, and testing results to be reviewed after the pipeline completes.
+
+---
+
+# 24. Pipeline Security Gates
+
+The pipeline contains multiple security and quality gates.
+
+| Control                      | Purpose                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| Source Vulnerability Scan    | Identifies known vulnerabilities in source dependencies and filesystem content |
+| Secret Detection             | Detects accidentally committed credentials and sensitive information           |
+| Unit Testing                 | Validates application functionality                                            |
+| Code Coverage                | Measures test execution coverage                                               |
+| Linting                      | Validates source-code quality and coding standards                             |
+| Static Analysis              | Identifies code-quality and maintainability issues                             |
+| Quality Gate                 | Determines whether the source meets configured quality requirements            |
+| Container Vulnerability Scan | Identifies vulnerabilities inside the container image                          |
+| SBOM                         | Provides software component visibility                                         |
+| RHACS Policy Validation      | Evaluates the image against container security policies                        |
+| Image Signing                | Establishes cryptographic authenticity                                         |
+| SBOM Attestation             | Provides verifiable software supply-chain metadata                             |
+| Signature Verification       | Validates the image signature                                                  |
+| RHACS Signature Policy       | Enforces the configured image-signature requirement                            |
+
+These controls provide defense in depth across the software delivery lifecycle.
+
+---
+
+# 25. Failure and Promotion Model
+
+Each security and quality stage can act as a promotion gate.
+
+When a required control fails, the pipeline stops the affected delivery path.
+
+Examples include:
+
+* Source security findings exceeding the configured threshold
+* Detected secrets
+* Failed unit tests
+* Linting violations
+* Failed static analysis Quality Gate
+* Container vulnerabilities exceeding the configured threshold
+* RHACS policy violations
+* Failed SBOM attestation
+* Failed image signature verification
+* Failed GitOps repository update
+
+This prevents an artifact that has failed a required control from automatically progressing to deployment.
+
+---
+
+# 26. Auditability
+
+The architecture provides traceability across the complete software delivery lifecycle.
+
+GitHub Actions provides:
+
+* Pipeline execution history
+* Stage results
+* Security results
+* Test results
+* Generated artifacts
+* Build information
+
+Git provides:
+
+* Source-code history
+* Deployment configuration history
+* Image digest changes
+* Deployment commits
+
+Cosign provides:
+
+* Image signatures
+* SBOM attestations
+* Cryptographic verification
+
+RHACS provides:
+
+* Image security policy results
+* Signature policy results
+* Security violations
+* Runtime security visibility
+
+Argo CD provides:
+
+* Git revision tracking
+* Synchronization status
+* Application health
+* Deployment history
+* Desired-state reconciliation
+
+OpenShift provides:
+
+* Deployment status
+* Workload status
+* Rollout information
+* Runtime state
+
+---
+
+# 27. Separation of Responsibilities
+
+The architecture separates responsibilities between the major components.
+
+## GitHub Actions
+
+Responsible for continuous integration, security validation, artifact creation, image signing, and updating the desired deployment state.
+
+## Container Registry
+
+Responsible for storing and distributing validated container images.
+
+## RHACS
+
+Responsible for container security policy evaluation, image security controls, signature policy enforcement, and runtime security.
+
+## GitOps Repository
+
+Responsible for storing the desired deployment state and immutable image references.
+
+## Argo CD
+
+Responsible for monitoring the GitOps repository and reconciling the OpenShift environment with the desired state.
+
+## OpenShift
+
+Responsible for running and managing the application workload.
+
+---
+
+
+---
+
+# 29. Design Principles
+
+The implementation follows these principles:
+
+1. Security is integrated throughout the software delivery lifecycle.
+2. Quality and security controls are automated.
+3. Failed security and quality gates prevent artifact promotion.
+4. Container images are deployed using immutable digests.
+5. Software components are documented through an SBOM.
+6. Container images are cryptographically signed.
+7. SBOMs are cryptographically attested.
+8. Image signatures are independently verified.
+9. RHACS provides additional image and runtime security controls.
+10. The `Require Cosign Signuture` RHACS policy provides image-signature enforcement.
+11. Git is the source of truth for the desired deployment state.
+12. GitHub Actions does not directly deploy application workloads to OpenShift.
+13. Argo CD performs automated synchronization and desired-state reconciliation.
+14. Pipeline reports and artifacts provide evidence of testing and security validation.
+15. Git history provides an auditable deployment trail.
+16. CI and CD responsibilities are separated.
+17. Application source and deployment configuration are maintained independently.
 
 ---
