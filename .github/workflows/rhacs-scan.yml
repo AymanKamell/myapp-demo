@@ -83,6 +83,7 @@ jobs:
         if: always()
         shell: bash
         run: |
+          python3 scripts/generate-rhacs-vulnerability-report.py
           python3 scripts/generate-rhacs-report.py
 
       - name: Upload RHACS JSON reports
@@ -101,6 +102,7 @@ jobs:
         with:
           name: rhacs-html-reports
           path: |
+            rhacs-image-scan.html
             rhacs-policy-check.html
           if-no-files-found: error
 
@@ -137,13 +139,13 @@ jobs:
             echo "|---|---|"
             echo "| Image | \`$IMAGE_REF\` |"
             echo "| RHACS Endpoint | \`$ROX_ENDPOINT\` |"
+            echo "| Scan Type | Image vulnerability scan |"
             echo "| Check Type | Build-stage policy compliance |"
             echo ""
             echo "### Reports"
             echo ""
-            echo "| Report | File |"
-            echo "|---|---|"
-            echo "| Vulnerability Scan JSON | \`rhacs-image-scan.json\` |"
-            echo "| Policy Check JSON | \`rhacs-policy-check.json\` |"
-            echo "| Policy Check HTML | \`rhacs-policy-check.html\` |"
+            echo "| Report Type | JSON | HTML |"
+            echo "|---|---|---|"
+            echo "| Vulnerability Scan | \`rhacs-image-scan.json\` | \`rhacs-image-scan.html\` |"
+            echo "| Policy Check | \`rhacs-policy-check.json\` | \`rhacs-policy-check.html\` |"
           } >> "$GITHUB_STEP_SUMMARY"
