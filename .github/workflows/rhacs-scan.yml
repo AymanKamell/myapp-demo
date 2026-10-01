@@ -42,62 +42,87 @@ jobs:
         run: |
           roxctl version
 
+      - name: Run RHACS image vulnerability scan
+        id: rhacs-scan
+        shell: bash
+        run: |
+          roxctl image scan \
+            -o json \
+            --image="$IMAGE_REF" \
+            > rhacs-image-scan.json
+
       - name: Run RHACS image policy check
         id: rhacs-check
         shell: bash
         run: |
-          set +e
-
           roxctl image check \
             -o json \
             --image="$IMAGE_REF" \
             > rhacs-policy-check.json
 
-          ROXCTL_EXIT_CODE=$?
-
-          set -e
-
-          echo "RHACS exit code: $ROXCTL_EXIT_CODE"
-          echo "exit-code=$ROXCTL_EXIT_CODE" >> "$GITHUB_OUTPUT"
-
-          exit 0
-
-      - name: Inspect RHACS JSON report
+      - name: Inspect RHACS JSON reports
         if: always()
+        shell: bash
         run: |
-          echo "===== RHACS POLICY CHECK ====="
-          jq . rhacs-policy-check.json
+          echo "===== RHACS IMAGE VULNERABILITY SCAN ====="
+          if [ -f rhacs-image-scan.json ]; then
+            jq . rhacs-image-scan.json
+          else
+            echo "RHACS image scan report was not generated."
+          fi
+
+          echo ""
+          echo "===== RHACS IMAGE POLICY CHECK ====="
+          if [ -f rhacs-policy-check.json ]; then
+            jq . rhacs-policy-check.json
+          else
+            echo "RHACS policy check report was not generated."
+          fi
 
       - name: Generate RHACS HTML report
         if: always()
+        shell: bash
         run: |
+          python3 scripts/generate-rhacs-vulnerability-report.py
           python3 scripts/generate-rhacs-report.py
 
-      - name: Upload RHACS JSON report
+      - name: Upload RHACS JSON reports
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: rhacs-policy-json
-          path: rhacs-policy-check.json
+          name: rhacs-json-reports
+          path: |
+            rhacs-image-scan.json
+            rhacs-policy-check.json
           if-no-files-found: error
 
-      - name: Upload RHACS HTML report
+      - name: Upload RHACS HTML reports
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: rhacs-policy-html-report
-          path: rhacs-policy-check.html
+          name: rhacs-html-reports
+          path: |
+            rhacs-image-scan.html
+            rhacs-policy-check.html
           if-no-files-found: error
 
       - name: Generate RHACS security summary
         if: always()
         env:
-          RHACS_EXIT_CODE: ${{ steps.rhacs-check.outputs.exit-code }}
+          RHACS_SCAN_OUTCOME: ${{ steps.rhacs-scan.outcome }}
+          RHACS_CHECK_OUTCOME: ${{ steps.rhacs-check.outcome }}
+        shell: bash
         run: |
-          if [ "$RHACS_EXIT_CODE" = "0" ]; then
-            GATE="PASS"
+          if [ "$RHACS_SCAN_OUTCOME" = "success" ]; then
+            SCAN_STATUS="PASS"
           else
-            GATE="FAIL"
+            SCAN_STATUS="FAIL"
+          fi
+
+          if [ "$RHACS_CHECK_OUTCOME" = "success" ]; then
+            CHECK_STATUS="PASS"
+          else
+            CHECK_STATUS="FAIL"
           fi
 
           {
@@ -105,8 +130,8 @@ jobs:
             echo ""
             echo "| Security Control | Result |"
             echo "|---|---|"
-            echo "| RHACS Image Policy Check | $GATE |"
-            echo "| RHACS Exit Code | $RHACS_EXIT_CODE |"
+            echo "| RHACS Vulnerability Scan | $SCAN_STATUS |"
+            echo "| RHACS Image Policy Check | $CHECK_STATUS |"
             echo ""
             echo "### Scan Target"
             echo ""
@@ -114,20 +139,13 @@ jobs:
             echo "|---|---|"
             echo "| Image | \`$IMAGE_REF\` |"
             echo "| RHACS Endpoint | \`$ROX_ENDPOINT\` |"
+            echo "| Scan Type | Image vulnerability scan |"
             echo "| Check Type | Build-stage policy compliance |"
-            echo "| JSON Report | rhacs-policy-check.json |"
-            echo "| HTML Report | rhacs-policy-check.html |"
+            echo ""
+            echo "### Reports"
+            echo ""
+            echo "| Report Type | JSON | HTML |"
+            echo "|---|---|---|"
+            echo "| Vulnerability Scan | \`rhacs-image-scan.json\` | \`rhacs-image-scan.html\` |"
+            echo "| Policy Check | \`rhacs-policy-check.json\` | \`rhacs-policy-check.html\` |"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Enforce RHACS security gate
-        if: always()
-        env:
-          RHACS_EXIT_CODE: ${{ steps.rhacs-check.outputs.exit-code }}
-        run: |
-          if [ "$RHACS_EXIT_CODE" != "0" ]; then
-            echo "RHACS security gate FAILED."
-            echo "One or more RHACS build-stage policies were violated."
-            exit 1
-          fi
-
-          echo "RHACS security gate PASSED."
