@@ -1,4 +1,4 @@
-# DevSecOps CI/CD Pipeline
+# End-to-End DevSecOps Pipeline & Runtime Governance
 
 ## 1. Overview
 
