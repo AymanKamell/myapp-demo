@@ -72,3 +72,28 @@ jobs:
       image-digest: ${{ needs.build-secure.outputs.image-digest }}
     secrets:
       GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+
+  ci-summary:
+    name: CI Pipeline Summary
+    if: always()
+    needs:
+      - source-security
+      - lint
+      - test
+      - sonarqube
+      - build-secure
+      - rhacs-scan
+      - cosign
+      - gitops-deploy
+    uses: ./.github/workflows/ci-summary.yaml
+    with:
+      source-security-result: ${{ needs.source-security.result }}
+      lint-result: ${{ needs.lint.result }}
+      test-result: ${{ needs.test.result }}
+      sonarqube-result: ${{ needs.sonarqube.result }}
+      build-result: ${{ needs.build-secure.result }}
+      rhacs-result: ${{ needs.rhacs-scan.result }}
+      cosign-result: ${{ needs.cosign.result }}
+      gitops-result: ${{ needs.gitops-deploy.result }}
+      image-digest: ${{ needs.build-secure.outputs.image-digest }}
+      image-ref: ${{ needs.build-secure.outputs.image-ref }}
