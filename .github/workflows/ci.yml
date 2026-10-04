@@ -17,7 +17,7 @@ jobs:
     uses: ./.github/workflows/lint.yml
 
   test:
-    uses: ./.github/workflows/tests.yml
+    uses: ./.github/workflows/test.yaml
 
   sonarqube:
     needs:
@@ -30,13 +30,12 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-secure:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - source-security
       - lint
       - test
       - sonarqube
-    uses: ./.github/workflows/build-secure-image.yml
+    uses: ./.github/workflows/build.yaml
     secrets:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
