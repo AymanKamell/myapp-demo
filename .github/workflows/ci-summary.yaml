@@ -1,0 +1,250 @@
+# CI Pipeline Summary Workflow
+#
+# Description:
+#   Reusable GitHub Actions workflow responsible for generating the
+#   authoritative pipeline-level CI summary.
+#
+#   The workflow aggregates the execution status of all CI controls and
+#   presents the final pipeline decision, pipeline context, immutable
+#   container artifact, supply-chain controls, and deployment controls.
+#
+# Usage:
+#   This workflow is intended to be called by the main CI orchestration
+#   workflow:
+#
+#     jobs:
+#       ci-summary:
+#         if: always()
+#         needs:
+#           - source-security
+#           - lint
+#           - test
+#           - sonarqube
+#           - build-secure
+#           - rhacs-scan
+#           - cosign
+#           - gitops-deploy
+#         uses: ./.github/workflows/ci-summary.yaml
+#         with:
+#           source-security-result: ${{ needs.source-security.result }}
+#           lint-result: ${{ needs.lint.result }}
+#           test-result: ${{ needs.test.result }}
+#           sonarqube-result: ${{ needs.sonarqube.result }}
+#           build-result: ${{ needs.build-secure.result }}
+#           rhacs-result: ${{ needs.rhacs-scan.result }}
+#           cosign-result: ${{ needs.cosign.result }}
+#           gitops-result: ${{ needs.gitops-deploy.result }}
+#           image-digest: ${{ needs.build-secure.outputs.image-digest }}
+#           image-ref: ${{ needs.build-secure.outputs.image-ref }}
+
+name: CI Pipeline Summary
+on:
+  workflow_call:
+    inputs:
+
+      source-security-result:
+        description: "Result of the source security workflow"
+        required: true
+        type: string
+
+      lint-result:
+        description: "Result of the lint workflow"
+        required: true
+        type: string
+
+      test-result:
+        description: "Result of the unit test workflow"
+        required: true
+        type: string
+
+      sonarqube-result:
+        description: "Result of the SonarQube workflow"
+        required: true
+        type: string
+
+      build-result:
+        description: "Result of the container build workflow"
+        required: true
+        type: string
+
+      rhacs-result:
+        description: "Result of the RHACS workflow"
+        required: true
+        type: string
+
+      cosign-result:
+        description: "Result of the Cosign workflow"
+        required: true
+        type: string
+
+      gitops-result:
+        description: "Result of the GitOps workflow"
+        required: true
+        type: string
+
+      image-digest:
+        description: "Immutable digest of the built container image"
+        required: false
+        type: string
+
+      image-ref:
+        description: "Immutable image reference of the built container image"
+        required: false
+        type: string
+
+jobs:
+  summary:
+    name: Generate CI Pipeline Summary
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Generate CI pipeline summary
+        env:
+          SOURCE_SECURITY_RESULT: ${{ inputs.source-security-result }}
+          LINT_RESULT: ${{ inputs.lint-result }}
+          TEST_RESULT: ${{ inputs.test-result }}
+          SONARQUBE_RESULT: ${{ inputs.sonarqube-result }}
+          BUILD_RESULT: ${{ inputs.build-result }}
+          RHACS_RESULT: ${{ inputs.rhacs-result }}
+          COSIGN_RESULT: ${{ inputs.cosign-result }}
+          GITOPS_RESULT: ${{ inputs.gitops-result }}
+
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+          IMAGE_REF: ${{ inputs.image-ref }}
+
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+
+        shell: bash
+        run: |
+          normalize_status() {
+            case "$1" in
+              success)
+                echo "PASS"
+                ;;
+              failure)
+                echo "FAIL"
+                ;;
+              cancelled)
+                echo "CANCELLED"
+                ;;
+              skipped)
+                echo "SKIPPED"
+                ;;
+              *)
+                echo "NOT_AVAILABLE"
+                ;;
+            esac
+          }
+
+          SOURCE_SECURITY_STATUS=$(normalize_status "$SOURCE_SECURITY_RESULT")
+          LINT_STATUS=$(normalize_status "$LINT_RESULT")
+          TEST_STATUS=$(normalize_status "$TEST_RESULT")
+          SONARQUBE_STATUS=$(normalize_status "$SONARQUBE_RESULT")
+          BUILD_STATUS=$(normalize_status "$BUILD_RESULT")
+          RHACS_STATUS=$(normalize_status "$RHACS_RESULT")
+          COSIGN_STATUS=$(normalize_status "$COSIGN_RESULT")
+          GITOPS_STATUS=$(normalize_status "$GITOPS_RESULT")
+
+          PIPELINE_STATUS="PASS"
+
+          for STATUS in \
+            "$SOURCE_SECURITY_STATUS" \
+            "$LINT_STATUS" \
+            "$TEST_STATUS" \
+            "$SONARQUBE_STATUS" \
+            "$BUILD_STATUS"
+          do
+            if [ "$STATUS" != "PASS" ]; then
+              PIPELINE_STATUS="FAIL"
+            fi
+          done
+
+          if [ "$EVENT_NAME" = "push" ] && [ "$BRANCH_NAME" = "main" ]; then
+            for STATUS in \
+              "$RHACS_STATUS" \
+              "$COSIGN_STATUS" \
+              "$GITOPS_STATUS"
+            do
+              if [ "$STATUS" != "PASS" ]; then
+                PIPELINE_STATUS="FAIL"
+              fi
+            done
+          fi
+
+          {
+            echo "# CI Pipeline Summary"
+            echo ""
+
+            echo "## Pipeline Decision"
+            echo ""
+            echo "| Control | Status |"
+            echo "|---|---|"
+            echo "| Overall CI Status | **$PIPELINE_STATUS** |"
+            echo "| Source Security | $SOURCE_SECURITY_STATUS |"
+            echo "| Linting | $LINT_STATUS |"
+            echo "| Unit Tests | $TEST_STATUS |"
+            echo "| SonarQube Quality Gate | $SONARQUBE_STATUS |"
+            echo "| Container Build | $BUILD_STATUS |"
+            echo "| RHACS Image Security | $RHACS_STATUS |"
+            echo "| Image Signing and Verification | $COSIGN_STATUS |"
+            echo "| GitOps Deployment Control | $GITOPS_STATUS |"
+
+            echo ""
+            echo "## Pipeline Context"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Event | \`$EVENT_NAME\` |"
+            echo "| Branch | \`$BRANCH_NAME\` |"
+            echo "| Commit | \`$COMMIT_SHA\` |"
+
+            echo ""
+            echo "## Build Artifact"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Immutable Image Reference | \`${IMAGE_REF:-NOT_AVAILABLE}\` |"
+            echo "| Image Digest | \`${IMAGE_DIGEST:-NOT_AVAILABLE}\` |"
+            echo "| SBOM | SPDX JSON |"
+            echo "| Image Signing | Cosign |"
+            echo "| Signature Verification | Public Key |"
+
+            echo ""
+            echo "## Supply Chain Controls"
+            echo ""
+            echo "| Control | Result |"
+            echo "|---|---|"
+            echo "| Source Vulnerability Scan | $SOURCE_SECURITY_STATUS |"
+            echo "| Secret Detection | $SOURCE_SECURITY_STATUS |"
+            echo "| Container Security Policy | $RHACS_STATUS |"
+            echo "| SBOM Generation | $BUILD_STATUS |"
+            echo "| SBOM Attestation | $COSIGN_STATUS |"
+            echo "| Image Signature | $COSIGN_STATUS |"
+            echo "| Signature Verification | $COSIGN_STATUS |"
+
+            echo ""
+            echo "## Deployment Control"
+            echo ""
+            echo "| Control | Result |"
+            echo "|---|---|"
+            echo "| GitOps Repository Update | $GITOPS_STATUS |"
+            echo "| Deployment Artifact | \`${IMAGE_DIGEST:-NOT_AVAILABLE}\` |"
+
+            echo ""
+            echo "## Pipeline Governance"
+            echo ""
+            echo "| Governance Area | Status |"
+            echo "|---|---|"
+            echo "| Source Security | $SOURCE_SECURITY_STATUS |"
+            echo "| Code Quality | $SONARQUBE_STATUS |"
+            echo "| Application Testing | $TEST_STATUS |"
+            echo "| Container Security | $RHACS_STATUS |"
+            echo "| Supply Chain Integrity | $COSIGN_STATUS |"
+            echo "| Deployment Control | $GITOPS_STATUS |"
+            echo "| Overall Pipeline Decision | **$PIPELINE_STATUS** |"
+          } >> "$GITHUB_STEP_SUMMARY"
