@@ -1,0 +1,130 @@
+# GitOps Deployment Workflow
+# Description:
+#   Reusable GitHub Actions workflow that updates the immutable backend
+#   image digest in the GitOps repository, creates a deployment branch,
+#   pushes the change, and opens a Pull Request against the protected
+#   main branch.
+#
+# Usage:
+#   This workflow is intended to be called by the main CI workflow:
+#
+#     jobs:
+#       gitops-deploy:
+#         uses: ./.github/workflows/gitops-deploy.yml
+#         with:
+#           image-digest: ${{ needs.build-secure.outputs.image-digest }}
+#         secrets:
+#           GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+
+name: GitOps Deployment
+
+on:
+  workflow_call:
+    inputs:
+      image-digest:
+        description: "Immutable image digest"
+        required: true
+        type: string
+
+    secrets:
+      GITOPS_TOKEN:
+        description: "Token used to update the GitOps repository and create the deployment Pull Request"
+        required: true
+
+jobs:
+  gitops-deploy:
+    name: Update GitOps Repository
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v6
+        with:
+          repository: AymanKamell/myapp-gitops
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: myapp-gitops
+
+      - name: Create deployment branch
+        working-directory: myapp-gitops
+        run: |
+          git switch --create "ci/update-backend-image-${GITHUB_SHA}-${GITHUB_RUN_ID}"
+
+      - name: Update backend image digest
+        working-directory: myapp-gitops
+        env:
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+        run: |
+          sed -i \
+            "s|^\(\s*digest:\s*\).*|\1${IMAGE_DIGEST}|" \
+            backend/kustomization.yaml
+
+      - name: Verify change
+        working-directory: myapp-gitops
+        run: |
+          git diff -- backend/kustomization.yaml
+
+      - name: Commit and push deployment branch
+        id: gitops-push
+        working-directory: myapp-gitops
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add backend/kustomization.yaml
+
+          git commit \
+            --message "Update backend image digest"
+
+          git push \
+            --set-upstream \
+            origin \
+            "ci/update-backend-image-${GITHUB_SHA}-${GITHUB_RUN_ID}"
+
+      - name: Create GitOps pull request
+        id: gitops-pr
+        working-directory: myapp-gitops
+        env:
+          GH_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+        run: |
+          gh pr create \
+            --repo AymanKamell/myapp-gitops \
+            --base main \
+            --head "ci/update-backend-image-${GITHUB_SHA}-${GITHUB_RUN_ID}" \
+            --title "Update backend image digest"
+
+      - name: Generate GitOps deployment summary
+        if: always()
+        env:
+          PUSH_OUTCOME: ${{ steps.gitops-push.outcome }}
+          PR_OUTCOME: ${{ steps.gitops-pr.outcome }}
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+        run: |
+          if [ "$PR_OUTCOME" = "success" ]; then
+            STATUS="PR_CREATED"
+          else
+            STATUS="FAILED"
+          fi
+
+          {
+            echo "## GitOps Deployment Summary"
+            echo ""
+            echo "| Deployment Control | Status |"
+            echo "|---|---|"
+            echo "| GitOps Branch Update | ${PUSH_OUTCOME^^} |"
+            echo "| GitOps Pull Request | $STATUS |"
+            echo ""
+            echo "### Deployment Details"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Repository | AymanKamell/myapp-gitops |"
+            echo "| Deployment Branch | \`ci/update-backend-image-${GITHUB_SHA}-${GITHUB_RUN_ID}\` |"
+            echo "| Target Branch | main |"
+            echo "| Manifest | backend/kustomization.yaml |"
+            echo "| Image Digest | \`$IMAGE_DIGEST\` |"
+            echo "| Deployment Approval | Required |"
+          } >> "$GITHUB_STEP_SUMMARY"
