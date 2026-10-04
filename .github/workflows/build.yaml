@@ -75,6 +75,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build backend image
+        id: build-image
         run: |
           docker build \
             -t "$IMAGE" \
@@ -103,6 +104,7 @@ jobs:
           if-no-files-found: error
 
       - name: Push backend image
+        id: push-image
         run: |
           docker push "$IMAGE"
 
