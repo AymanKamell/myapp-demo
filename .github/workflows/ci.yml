@@ -66,7 +66,7 @@ jobs:
     needs:
       - build-secure
       - cosign
-    uses: ./.github/workflows/gitops-deploy.yml
+    uses: ./.github/workflows/gitops-deploy2.yaml
     with:
       image-digest: ${{ needs.build-secure.outputs.image-digest }}
     secrets:
