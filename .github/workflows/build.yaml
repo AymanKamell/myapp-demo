@@ -44,7 +44,7 @@ on:
 
 jobs:
   build-image:
-    name: Build, Scan and Push Image
+    name: Build, Generate SBOM and Push Image
     runs-on: ubuntu-latest
 
     outputs:
