@@ -125,18 +125,16 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.image-digest.outputs.image-digest }}
           IMAGE_REF: ${{ steps.image-digest.outputs.image-ref }}
-          BUILD_OUTCOME: ${{ steps.build-image.outcome }}
-          SBOM_OUTCOME: ${{ steps.sbom.outcome }}
-          PUSH_OUTCOME: ${{ steps.push-image.outcome }}
         run: |
           {
             echo "## Build and Image Summary"
             echo ""
             echo "| Control | Status |"
             echo "|---|---|"
-            echo "| Container Build | ${BUILD_OUTCOME^^} |"
-            echo "| SBOM Generation | ${SBOM_OUTCOME^^} |"
-            echo "| Image Push | ${PUSH_OUTCOME^^} |"
+            echo "| Container Build | ${{ steps.build-image.outcome }} |"
+            echo "| SBOM Generation | ${{ steps.sbom.outcome }} |"
+            echo "| Image Push | ${{ steps.push-image.outcome }} |"
+
             echo ""
             echo "### Image"
             echo ""
