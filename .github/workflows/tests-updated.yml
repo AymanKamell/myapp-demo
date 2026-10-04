@@ -1,3 +1,29 @@
+# Unit Test Workflow
+#
+# Description:
+#   Reusable GitHub Actions workflow for executing the backend unit test
+#   suite with pytest. The workflow generates JUnit, HTML, and coverage
+#   reports, publishes JUnit results to GitHub Actions using
+#   dorny/test-reporter, and preserves the generated reports as workflow
+#   artifacts.
+#
+# Usage:
+#   This workflow is intended to be called by another GitHub Actions
+#   workflow as a reusable workflow:
+#
+#     jobs:
+#       unit-tests:
+#         uses: ./.github/workflows/test.yaml
+#
+# Outputs:
+#   - GitHub Actions test report from JUnit XML results
+#   - HTML test report
+#   - JUnit XML test results
+#   - XML coverage report
+#
+# Test Location:
+#   backend/backend-application
+
 name: Unit Tests
 
 on:
@@ -73,7 +99,6 @@ jobs:
 
       - name: Generate test summary
         if: always()
-        working-directory: backend/backend-application
         env:
           TEST_OUTCOME: ${{ steps.pytest.outcome }}
         run: |
@@ -83,53 +108,20 @@ jobs:
             echo "| Test Control | Status |"
             echo "|---|---|"
             echo "| Unit Tests | ${TEST_OUTCOME^^} |"
-            echo "| HTML Test Report | GENERATED |"
-            echo "| JUnit Test Results | GENERATED |"
-            echo "| Coverage Report | GENERATED |"
-
-            echo ""
-            echo "### Individual Test Results"
-            echo ""
-            echo "| Test | Class | Status | Duration |"
-            echo "|---|---|---|---:|"
-
-            python - <<'PY'
-          import xml.etree.ElementTree as ET
-
-          root = ET.parse("junit.xml").getroot()
-
-          for testcase in root.iter("testcase"):
-              name = testcase.attrib.get("name", "")
-              classname = testcase.attrib.get("classname", "")
-              duration = testcase.attrib.get("time", "0")
-
-              if testcase.find("failure") is not None:
-                  status = "FAILED"
-              elif testcase.find("error") is not None:
-                  status = "ERROR"
-              elif testcase.find("skipped") is not None:
-                  status = "SKIPPED"
-              else:
-                  status = "PASSED"
-
-              name = name.replace("|", "\\|")
-              classname = classname.replace("|", "\\|")
-
-              print(f"| {name} | {classname} | {status} | {duration}s |")
-          PY
-
-            echo ""
-            echo "### Test Configuration"
-            echo ""
-            echo "| Parameter | Configuration |"
-            echo "|---|---|"
-            echo "| Framework | pytest |"
+            echo "| Test Framework | pytest |"
             echo "| Python Version | 3.12 |"
             echo "| Test Location | backend/backend-application |"
             echo "| Coverage Tool | pytest-cov |"
-            echo "| Coverage Report | coverage.xml |"
-            echo "| Test Report Format | HTML |"
-            echo "| Test Report Artifact | pytest-html-report |"
-            echo "| JUnit Results Artifact | junit-test-results |"
-            echo "| Coverage Artifact | python-coverage |"
+            echo "| Coverage Report | GENERATED |"
+            echo "| HTML Test Report | GENERATED |"
+            echo "| JUnit Test Results | GENERATED |"
+
+            echo ""
+            echo "## Test Artifacts"
+            echo ""
+            echo "| Artifact | Purpose |"
+            echo "|---|---|"
+            echo "| pytest-html-report | Detailed HTML test report |"
+            echo "| junit-test-results | JUnit XML test results |"
+            echo "| python-coverage | XML coverage report |"
           } >> "$GITHUB_STEP_SUMMARY"
