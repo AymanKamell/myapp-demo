@@ -1,3 +1,20 @@
+# Description:
+#   Reusable workflow that performs SonarQube Cloud static code analysis,
+#   enforces the quality gate, and publishes code quality and coverage metrics.
+#
+# Usage:
+#   Called by the main CI workflow after tests and coverage generation:
+#
+#     sonarqube:
+#       needs:
+#         - test
+#       uses: ./.github/workflows/sonarqube-updated.yml
+#       permissions:
+#         contents: read
+#         actions: read
+#       secrets:
+#         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
 name: SonarQube Cloud Analysis
 
 on:

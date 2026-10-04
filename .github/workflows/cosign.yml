@@ -1,3 +1,22 @@
+# Description:
+#   Reusable workflow that attests the SBOM, signs the immutable container
+#   image with Cosign, verifies both controls, and generates a security summary.
+#
+# Usage:
+#   Called by the main CI workflow after the image build and RHACS validation:
+#
+#     cosign:
+#       needs:
+#         - build-secure
+#         - rhacs-scan
+#       uses: ./.github/workflows/cosign.yaml
+#       with:
+#         image-ref: ${{ needs.build-secure.outputs.image-ref }}
+#       secrets:
+#         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+#         COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+#         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
 name: Cosign Image Security
 
 on:

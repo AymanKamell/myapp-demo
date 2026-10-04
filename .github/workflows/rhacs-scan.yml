@@ -1,3 +1,19 @@
+# Description:
+#   Reusable workflow that scans the container image with RHACS, evaluates
+#   image security policies, and generates vulnerability and policy reports.
+#
+# Usage:
+#   Called by the main CI workflow after the image is built:
+#
+#     rhacs-scan:
+#       needs:
+#         - build-secure
+#       uses: ./.github/workflows/rhacs-scan.yml
+#       with:
+#         image-ref: ${{ needs.build-secure.outputs.image-ref }}
+#       secrets:
+#         ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+
 name: RHACS Image Security Scan
 
 on:

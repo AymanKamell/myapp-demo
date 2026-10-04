@@ -1,3 +1,13 @@
+# Description:
+#   Reusable workflow that runs Ruff linting against the Python application,
+#   generates lint reports, and publishes the lint results to the workflow summary.
+#
+# Usage:
+#   Called by the main CI workflow:
+#
+#     lint:
+#       uses: ./.github/workflows/lint.yml
+
 name: Python Linting
 
 on:
