@@ -1,3 +1,14 @@
+# Description:
+#   Reusable workflow for pre-build source security analysis. It scans the
+#   application filesystem and dependency components with Trivy and performs
+#   dedicated secret detection with Gitleaks before container image creation.
+#
+# Usage:
+#   Called by the main CI workflow:
+#
+#     source-security:
+#       uses: ./.github/workflows/source-security.yml
+
 name: Source Security
 
 on:
