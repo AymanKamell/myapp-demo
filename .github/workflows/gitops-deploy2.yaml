@@ -94,7 +94,8 @@ jobs:
             --repo AymanKamell/myapp-gitops \
             --base main \
             --head "ci/update-backend-image-${GITHUB_SHA}-${GITHUB_RUN_ID}" \
-            --title "Update backend image digest"
+            --title "Update backend image digest" \
+            --body "Automated GitOps deployment update. Review and approve before merging."
 
       - name: Generate GitOps deployment summary
         if: always()
