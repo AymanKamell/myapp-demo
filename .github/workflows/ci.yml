@@ -17,7 +17,7 @@ jobs:
     uses: ./.github/workflows/lint.yml
 
   test:
-    uses: ./.github/workflows/tests-updated.yml
+    uses: ./.github/workflows/test.yaml
 
   sonarqube:
     needs:
