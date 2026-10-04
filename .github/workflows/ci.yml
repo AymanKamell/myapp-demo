@@ -20,8 +20,6 @@ jobs:
     uses: ./.github/workflows/test.yaml
 
   sonarqube:
-    needs:
-      - test
     uses: ./.github/workflows/sonarqube-updated.yml
     permissions:
       contents: read
